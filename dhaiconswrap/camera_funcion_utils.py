@@ -7,7 +7,7 @@ except:
 
 ############################ RGB SENSOR CONFIGURATION FUNCTIONS ############################
 
-def configure_rgb_sensor(pipeline,size,fps,nn_active,blob_path,calibration=False):
+def configure_rgb_sensor(pipeline,size,fps,nn_active,calibration=False,blob_path = None):
 
 		cam_rgb = pipeline.create(dhai.node.ColorCamera)
 		cam_rgb.setResolution(dhai.ColorCameraProperties.SensorResolution.THE_1080_P)
@@ -24,6 +24,8 @@ def configure_rgb_sensor(pipeline,size,fps,nn_active,blob_path,calibration=False
 		if nn_active:
 			manip,_= configure_image_manipulator(pipeline)
 			cam_rgb.preview.link(manip.inputImage)
+			if blob_path is None:
+				raise(" BLOB PATH NOT SELECTED!! Please select the path to .blob files")
 			configure_nn_node(manip,pipeline,blob_path)
 		return xout_rgb
 

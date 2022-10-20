@@ -7,11 +7,6 @@ import cv2
 import numpy as np
 import os
 
-#import ptvsd
-
-# from _pydev_bundle import pydev_monkey_qt
-# pydev_monkey_qt.patch_qt('auto')
-
 try:
 	from .calibrationLib.calibration_kabsch import Transformation
 except:
@@ -19,12 +14,6 @@ except:
 
 from .camera_funcion_utils import configure_rgb_sensor,configure_depth_sensor,create_pointcloud_manager
 
-CURRENT_FOLDER = os.getcwd()
-BLOB_FODLER  = os.path.join(CURRENT_FOLDER,"neuralNetwork")
-BLOB_NAME = "mobilenet-ssd_openvino_2021.2_6shave.blob"
-BLOB_PATH = os.path.join(BLOB_FODLER,BLOB_NAME)
-
-ZmmConversion = 1000
 
 # Help functions
 
@@ -47,18 +36,23 @@ class IntrinsicParameters():
 
 class DeviceManager():
 
-	def __init__(self,size,fps,nn_mode,calibration_mode = False):
+	def __init__(self,size,fps,nn_mode,calibration_mode = False,blob_path=None):
 		self.pipeline = dhai.Pipeline()
 		self.size = size
 		self.fps = fps
 		self.nn_active = nn_mode
 		self.calibration = calibration_mode
+		self.zmmconversion = 1000
+		self.BLOB_PATH = blob_path
 		self._configure_device()
 		self.node_list = self.pipeline.getNodeMap()
 
 	def _configure_device(self):
 
-		configure_rgb_sensor(self.pipeline,self.size,self.fps,self.nn_active,BLOB_PATH,self.calibration)
+		if self.nn_active:
+			configure_rgb_sensor(self.pipeline,self.size,self.fps,self.nn_active,self.BLOB_PATH,self.calibration)
+		else:
+			configure_rgb_sensor(self.pipeline,self.size,self.fps,self.nn_active,self.calibration)
 		configure_depth_sensor(self.pipeline,self.calibration)
 
 
@@ -102,13 +96,19 @@ class DeviceManager():
 			cv2.rectangle(image,(xmin,ymin),(xmax,ymax),(255,255,255),2)
 			cv2.putText(image,f'{label}: {round(score*100,2)} %',(xmin,ymin-10),cv2.FONT_HERSHEY_COMPLEX,1,(255,255,255),2)
 
+	def set_conversion_depth(self,conv_factor):
+		'''
+			default value is 1000 which means the output will be in mm as default
+		'''
+		self.zmmconversion = conv_factor
+
 	def _convert_depth(self,depth):
-		depth = depth.flatten()/ZmmConversion
+		depth = depth.flatten()/self.zmmconversion
 		depth = np.reshape(depth,(self.size[1],self.size[0]))
 		return depth
 
 	def _determinate_object_location(self,image_to_write,points_cloud_data,detections):
-		#ptvsd.debug_this_thread()
+		
 		xyz_points = points_cloud_data['XYZ_map_valid']
 		for detection in detections:
 			xmin,ymin,xmax,ymax = detection[2]
@@ -182,19 +182,4 @@ class DeviceManager():
 		calibration_info = self.device_.readCalibration()
 		extrin_info = calibration_info.getCameraExtrinsics(dhai.CameraBoardSocket.LEFT,dhai.CameraBoardSocket.RGB)
 		self.extrinsic_info = Transformation(trasformation_mat=np.array(extrin_info))
-
-if __name__ == '__main__':
-
-	get_available_device()
-	cam = DeviceManager((640,480),30,nn_mode=False)
-	cam.enable_device()
-
-	frame = 0
-	while True:
-		stato,frames = cam.poll_for_frames()
-		if stato:
-			cv2.imshow('frame',frames['color_image'])
-			cv2.imshow('disparity map',frames['disparity_image'])
-			if cv2.waitKey(1) == ord('q'):
-				break
 
