@@ -17,7 +17,7 @@ setup(
 
     classifiers=[
         'Development Status :: 1 - Planning',
-        'Intended Audience :: Science/Research',
+        'Intended Audience :: Science/Research/hobbiest',
         'License :: LGPL License',  
         'Operating System :: POSIX :: Linux :: Windows',        
         'Programming Language :: Python :: 3.8',
