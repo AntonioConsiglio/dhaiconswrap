@@ -149,7 +149,7 @@ class DeviceManager():
 		- output:\n
 			frame_state: bool \n
 			frames: dict[color_image,depth,disparity_image]
-			results: dict['point_clouds_data','detections']
+			results: dict['points_cloud_data','detections']
 		'''
 		frames = {}
 		state_frame = False
@@ -175,10 +175,10 @@ class DeviceManager():
 				frames['depth'] = self._convert_depth(depth.getFrame())
 				frames['disparity_image'] = disparity_frame.getFrame()#*(255 /self.max_disparity)).astype(np.uint8)
 				results = {}
-				results['point_clouds_data'] = None
+				results['points_cloud_data'] = None
 				results['detections'] = None
 				if self.pointcloud_manager is not None:
-					results['point_clouds_data'] = self.pointcloud_manager.PointsCloudManagerStartCalculation(depth_image=frames['depth'],
+					results['points_cloud_data'] = self.pointcloud_manager.PointsCloudManagerStartCalculation(depth_image=frames['depth'],
 														color_image=frames['color_image'],
 														APPLY_ROI=False,
 														Kdecimation=1,

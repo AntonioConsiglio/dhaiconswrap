@@ -36,6 +36,8 @@ class PointsCloudManager:
 										  viewROI)
 			if result:
 				self._hasresult(result)
+			
+			return result
 
 	def _hasresult(self,results):
 		self.data = results
