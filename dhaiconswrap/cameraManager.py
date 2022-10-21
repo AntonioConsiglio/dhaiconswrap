@@ -107,25 +107,42 @@ class DeviceManager():
 		depth = np.reshape(depth,(self.size[1],self.size[0]))
 		return depth
 
-	def determinate_object_location(self,image_to_write,points_cloud_data,detections):
-		
+	def determinate_object_location(self,image_to_write,points_cloud_data,detections,offset=10):
+		'''
+			input:\n
+			image_to_write: image where the average position is written
+			points_cloud_dat: the points cloud results, stored inside a dictionary as in results \n
+							obtained using the pull for frames method\n
+			detections: list of detections\n
+			offset: default = 10, the offset from the center of the detection to take the points cloud value\n
+					and averaging them to output the position in the space of the object\n
+			Output:\n
+			cordinates: list of finded cordinates of the obects 		
+		'''
+		cordinates = []
 		xyz_points = points_cloud_data['XYZ_map_valid']
 		for detection in detections:
 			xmin,ymin,xmax,ymax = detection[2]
 			xcenter = (xmin+((xmax-xmin)//2))
 			ycenter = (ymin+((ymax-ymin)//2))
-			offset = 10
 			useful_value = xyz_points[ycenter-offset:ycenter+offset,xcenter-offset:xcenter+offset]
-			avg_pos_obj = np.round(np.mean(useful_value),3)
-			if avg_pos_obj != 0:
-				x,y,z = [i for i in avg_pos_obj]
-				cv2.addText(image_to_write,f'x: {x} m',(xcenter+5,ycenter-20),cv2.FONT_HERSHEY_PLAIN,1,(255,0,0),2)
-				cv2.addText(image_to_write,f'y: {y} m',(xcenter+5,ycenter-10),cv2.FONT_HERSHEY_PLAIN,1,(255,0,0),2)
-				cv2.addText(image_to_write,f'z: {z} m',(xcenter+5,ycenter),cv2.FONT_HERSHEY_PLAIN,1,(255,0,0),2)
-			cv2.circle(image_to_write,(xcenter,ycenter),3,(255,0,0),-1)
-			#print(f'The object {detection[0]} has an average position of: {avg_pos_obj} m')
-
-		return None
+			useful_value = useful_value.reshape((useful_value.shape[0]*useful_value.shape[1],3))
+			useful_value = useful_value[np.any(useful_value != 0,axis=1)]
+			if useful_value.shape[0] >1:
+				avg_pos_obj = (np.mean(useful_value,axis=0)*1000).astype(int)
+			else:
+				avg_pos_obj= (useful_value*1000).astype(int)
+			if not np.all(avg_pos_obj == 0):
+				cordinates.append(avg_pos_obj.tolist())
+				try:
+					x,y,z = avg_pos_obj.tolist()
+					cv2.putText(image_to_write,f"x: {x} mm",(xcenter+8,ycenter-30),cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,0,0),2)
+					cv2.putText(image_to_write,f'y: {y} mm',(xcenter+8,ycenter-15),cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,0,0),2)
+					cv2.putText(image_to_write,f'z: {z} mm',(xcenter+8,ycenter),cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,0,0),2)
+				except Exception as e:
+					print(e)
+			
+		return cordinates
 
 	def pull_for_frames(self):
 		'''
@@ -161,7 +178,7 @@ class DeviceManager():
 				results['point_clouds_data'] = None
 				results['detections'] = None
 				if self.pointcloud_manager is not None:
-					results['point_clouds_data'] = self.pointcloud_manager.start_calculation(depth_image=frames['depth'],
+					results['point_clouds_data'] = self.pointcloud_manager.PointsCloudManagerStartCalculation(depth_image=frames['depth'],
 														color_image=frames['color_image'],
 														APPLY_ROI=False,
 														Kdecimation=1,

@@ -1,1 +1,1 @@
-from .pointclouds_manager import *
+from .pointclouds_manager import PointsCloudManager

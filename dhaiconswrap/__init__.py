@@ -2,12 +2,17 @@
 dhaiconswrap.
 
 A python wrapper for OAK-Luxonis cameras.
+Calibration function and Points Cloud manager can be used with other cameras if you use the same method names.
 """
 
-__version__ = "0.1.8"
+__version__ = "0.1.10"
 __author__ = 'Antonio Consiglio'
+try:
+    __import__('pkg_resources').declare_namespace(__name__)
+except ImportError:
+    __path__ = __import__('pkgutil').extend_path(__path__, __name__)
+    
+from .calibrationLib import docalibration
+from .pointclouds_utils import PointsCloudManager
+from .cameraManager import DeviceManager,get_available_device
 
-
-__import__('calibrationLib').declare_namespace(__name__)
-__import__('pointclouds_utils').declare_namespace(__name__)
-__import__('cameraManager').declare_namespace(__name__)
