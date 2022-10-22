@@ -55,7 +55,7 @@ class DeviceManager():
 	
 	def _configure_rgb_sensor(self):
 		if self.nn_active:
-			configure_rgb_sensor(self.pipeline,self.size,self.fps,self.nn_active,self.BLOB_PATH,self.calibration)
+			configure_rgb_sensor(self.pipeline,self.size,self.fps,self.nn_active,self.calibration,self.BLOB_PATH)
 		else:
 			configure_rgb_sensor(self.pipeline,self.size,self.fps,self.nn_active,self.calibration)
 	
