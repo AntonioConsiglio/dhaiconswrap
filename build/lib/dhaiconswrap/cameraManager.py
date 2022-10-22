@@ -49,12 +49,18 @@ class DeviceManager():
 
 	def _configure_device(self):
 
+		self._configure_rgb_sensor()
+		self._configure_depth_sensor()
+		
+	
+	def _configure_rgb_sensor(self):
 		if self.nn_active:
 			configure_rgb_sensor(self.pipeline,self.size,self.fps,self.nn_active,self.BLOB_PATH,self.calibration)
 		else:
 			configure_rgb_sensor(self.pipeline,self.size,self.fps,self.nn_active,self.calibration)
+	
+	def _configure_depth_sensor(self):
 		configure_depth_sensor(self.pipeline,self.calibration)
-
 
 	def enable_device(self):
 		self.device_ = dhai.Device(self.pipeline,usb2Mode=True)
@@ -128,10 +134,13 @@ class DeviceManager():
 			useful_value = xyz_points[ycenter-offset:ycenter+offset,xcenter-offset:xcenter+offset]
 			useful_value = useful_value.reshape((useful_value.shape[0]*useful_value.shape[1],3))
 			useful_value = useful_value[np.any(useful_value != 0,axis=1)]
-			if useful_value.shape[0] >1:
-				avg_pos_obj = (np.mean(useful_value,axis=0)*1000).astype(int)
+			if useful_value.size == 0:
+				continue 
+			elif useful_value.shape[0] >1:
+				avg_pos_obj = np.mean(useful_value,axis=0)*1000
 			else:
-				avg_pos_obj= (useful_value*1000).astype(int)
+				avg_pos_obj= useful_value[0]*1000
+			avg_pos_obj = avg_pos_obj.astype(int)
 			if not np.all(avg_pos_obj == 0):
 				cordinates.append(avg_pos_obj.tolist())
 				try:
@@ -140,7 +149,7 @@ class DeviceManager():
 					cv2.putText(image_to_write,f'y: {y} mm',(xcenter+8,ycenter-15),cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,0,0),2)
 					cv2.putText(image_to_write,f'z: {z} mm',(xcenter+8,ycenter),cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,0,0),2)
 				except Exception as e:
-					print(e)
+					print(f"[CALCULATE OBJECT LOCATION]: {e}")
 			
 		return cordinates
 
