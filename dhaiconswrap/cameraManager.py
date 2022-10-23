@@ -5,7 +5,6 @@ except:
 	print('Install depthai library ... "pip install depthai"')
 import cv2
 import numpy as np
-import os
 
 try:
 	from .calibrationLib.calibration_kabsch import Transformation

@@ -1,8 +1,5 @@
 import os
-from shutil import copyfile
 import json
-
-import cv2
 import numpy as np
 
 from .calibration_kabsch import PoseEstimation, Transformation
