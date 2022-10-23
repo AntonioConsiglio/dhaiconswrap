@@ -55,6 +55,55 @@ def docalibration(device_manager,intrinsics_devices,extriniscs_device, chessboar
 	except Exception as e:
 		print(e)
 
+def domulticalibration(device_managers,intrinsics_devices,extriniscs_devices, chessboard_params, calibration_roi, shiftcalibration, path = "./"):
+	'''
+	#This function is used to calibrate more then one cameras in 3D space.\n
+	input:\n
+	- device_manager : dictionary within class to manage cameras\n
+	- intrisics_devices: dictionary within class intrinsic camera's parameters\n
+	- chessboard_params: [n_corners_along_h, n_corners_along_w, square_size]\n
+	- calibration_roi: Region of interest\n
+	- shiftcalibration: a vector if there is a shift of the calibration\n
+	- path: the path where the .json file with calibration parameters (trasportation matrix) is stored\n
+	'''
+
+	try:
+		calibrated_device_count = 0
+
+		transformation_results_kabsch = {}
+		while calibrated_device_count < len(device_managers):
+			calibrated_device_count = 0
+			for key, device in device_managers.items():
+
+				state,frames,_ = device.pull_for_frames()
+				if state:
+					pose_estimator = PoseEstimation(frames, intrinsics_devices[key],extriniscs_devices[key], chessboard_params)
+					print(f"[{key}] : PERFORM POSE ESTIMATION")
+					transformation_results_kabsch[key], corners3D,_ = pose_estimator.perform_pose_estimation()
+					#object_point, _ = pose_estimator.get_chessboard_corners_in3d()
+
+					if not transformation_results_kabsch[key][0]:
+						print(f"For DEVICE: {key} ==>")
+						print("Place the chessboard on the plane where the object needs to be detected..")
+					else:
+						calibrated_device_count += 1
+
+		# Save the transformation object for all devices in an array to use for measurements
+		transformation_devices = {}
+		for key,transformation_result_kabsch in transformation_results_kabsch.itmes():
+			transformation_device= transformation_result_kabsch[1].inverse()
+			t = Transformation(translation_vector = -np.array(shiftcalibration))
+			mf = np.dot(t.get_matrix(),transformation_device.get_matrix())
+			transformation_device.set_matrix(mf)
+			transformation_devices[key] = transformation_device
+
+		roi_2D = calibration_roi
+
+		save_calibration_json(transformation_device, roi_2D, path)
+		return corners3D
+	except Exception as e:
+		print(e)
+
 def check_calibration_exist(path = "./"):
 
 	if not os.path.isfile(get_roi_2D_name(path)):
@@ -63,11 +112,17 @@ def check_calibration_exist(path = "./"):
 		return False
 	return True
 
-def load_calibration_json(path = "./"):
+def load_calibration_json(path = "./",id=None):
 
-	with open('camera_calibration.json') as json_file:
-		pose_mat = np.array(json.load(json_file))
-		transformation_devices = Transformation(pose_mat[:3,:3],pose_mat[:3,3])
+	if id is None:
+		with open('camera_calibration.json') as json_file:
+			pose_mat = np.array(json.load(json_file))
+			transformation_devices = Transformation(pose_mat[:3,:3],pose_mat[:3,3])
+	else:
+		with open(f'{id}_camera_calibration.json') as json_file:
+			pose_mat = np.array(json.load(json_file))
+			transformation_devices = Transformation(pose_mat[:3,:3],pose_mat[:3,3])
+
 
 	with open('roi_2D.json') as json_file:
 		roi_2D = json.load(json_file)
@@ -76,18 +131,27 @@ def load_calibration_json(path = "./"):
 
 	return transformation_devices, roi_2D, viewROI
 
-def get_calibration_name(path):
-	return os.path.join(path,'camera_calibration.json')
+def get_calibration_name(path,id=None):
+	if id is None:
+		return os.path.join(path,'camera_calibration.json')
+	else:
+		return os.path.join(path,f'{id}_camera_calibration.json')
 
 def get_roi_2D_name(path):
 	return os.path.join(path, 'roi_2D.json')
 
 def save_calibration_json(transformation_devices, roi_2D, path = "./"):
 	
-	transformation_device = transformation_devices
-	mat = transformation_device.get_matrix()
-	with open(get_calibration_name(path), 'w') as outfile:
-		json.dump(mat.tolist(), outfile)
+	if transformation_devices is dict:
+		transformation_device = transformation_devices
+		mat = transformation_device.get_matrix()
+		with open(get_calibration_name(path), 'w') as outfile:
+			json.dump(mat.tolist(), outfile)
+	else:
+		transformation_device = transformation_devices
+		mat = transformation_device.get_matrix()
+		with open(get_calibration_name(path), 'w') as outfile:
+			json.dump(mat.tolist(), outfile)
 	with open(get_roi_2D_name(path), 'w') as outfile:
 		json.dump(roi_2D, outfile)
 

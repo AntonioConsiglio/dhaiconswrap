@@ -146,7 +146,7 @@ class DeviceManager():
 		
 		return manip,manipOut
 
-	def _configure_nn_node(manip,pipeline,blob_path):
+	def _configure_nn_node(self,manip,pipeline,blob_path):
 			
 			nn = pipeline.create(dhai.node.MobileNetDetectionNetwork)
 			nnOut = pipeline.create(dhai.node.XLinkOut)
@@ -178,7 +178,7 @@ class DeviceManager():
 		depth.disparity.link(xout_disparity.input)
 		depth.depth.link(xout_depth.input)
 
-	def _configure_depth_proprieties(left,right,depth,calibration):
+	def _configure_depth_proprieties(self,left,right,depth,calibration):
 
 		if not calibration:
 			left.setResolution(dhai.MonoCameraProperties.SensorResolution.THE_480_P)
