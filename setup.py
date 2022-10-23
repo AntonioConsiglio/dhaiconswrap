@@ -2,7 +2,7 @@ from setuptools import setup,find_packages
 
 setup(
     name='dhaiconswrap',
-    version='0.1.17',    
+    version='0.1.18',    
     description='A depthai wrapper with calibration and points cloud functions',
     url='https://github.com/AntonioConsiglio/dhaiconswrap',
     author='Antonio Consiglio',
