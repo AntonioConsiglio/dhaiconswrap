@@ -16,16 +16,20 @@ def get_available_devices():
 
 	available_devices = dhai.Device.getAllAvailableDevices()
 	cameras_id = [device.getMxId() for device in available_devices]
-	print(cameras_id)
+	print(f'[CAMERAS FOUNDED] : {cameras_id}')
+	return cameras_id
 
 	############################ POINTCLOUD MANAGER FUNCTIONS ############################
 
-def create_pointcloud_manager(id,calibrationInfo):
+def create_pointcloud_manager(id=None,calibrationInfo=None):
 
-	pointcloud_manager = PointsCloudManager(id)
-	if not check_calibration_exist():
+	if id is None:
+		pointcloud_manager = PointsCloudManager('None')
+	else:
+		pointcloud_manager = PointsCloudManager('None')
+	if not check_calibration_exist(idname=id):
 		return None
-	calibration_info,roi_2D,viewROI = load_calibration_json()
+	calibration_info,roi_2D,viewROI = load_calibration_json(id=id)
 	pointcloud_manager.viewROI = viewROI
 	calibrationInfo.append(calibration_info)
 	pointcloud_manager.SetParameters(calibrationInfo,roi_2D,viewROI)

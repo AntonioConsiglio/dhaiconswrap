@@ -16,10 +16,11 @@ from .camera_funcion_utils import BlobException,IntrinsicParameters,create_point
 
 class DeviceManager():
 
-	def __init__(self,size,fps,nn_mode=False,calibration_mode = False,blob_path=None):
+	def __init__(self,size=(640,480),fps=30,deviceid = None,nn_mode=False,calibration_mode = False,blob_path=None):
 		self.pipeline = dhai.Pipeline()
 		self.size = size
 		self.fps = fps
+		self.deviceId = deviceid
 		self.nn_active = nn_mode
 		self.calibration = calibration_mode
 		self.zmmconversion = 1000
@@ -33,7 +34,13 @@ class DeviceManager():
 		self._configure_depth_sensor()
 	
 	def enable_device(self):
-		self.device_ = dhai.Device(self.pipeline,usb2Mode=True)
+		if self.deviceId is None:
+			self.device_ = dhai.Device(self.pipeline,usb2Mode=True)
+		else:
+			found, device_info = dhai.Device.getDeviceByMxId(self.deviceId)
+			if not found:
+				raise RuntimeError("Device not found!")
+			self.device_ = dhai.Device(self.pipeline,device_info,usb2Mode=True)
 		if self.nn_active:
 			self.max_disparity = self.node_list[8].initialConfig.getMaxDisparity()
 		else:

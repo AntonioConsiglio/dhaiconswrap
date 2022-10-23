@@ -9,12 +9,11 @@ from .calibration_kabsch import PoseEstimation, Transformation
 
 
 
-def docalibration(device_manager,intrinsics_devices,extriniscs_device, chessboard_params, calibration_roi, shiftcalibration, path = "./"):
+def docalibration(device_manager, chessboard_params, calibration_roi, shiftcalibration, path = "./"):
 	'''
 	#This function is used to calibrate one or more cameras in 3D space.\n
 	input:\n
 	- device_manager : class to manage cameras\n
-	- intrisics_devices: intrinsic camera's parameters\n
 	- chessboard_params: [n_corners_along_h, n_corners_along_w, square_size]\n
 	- calibration_roi: Region of interest\n
 	- shiftcalibration: a vector if there is a shift of the calibration\n
@@ -24,12 +23,12 @@ def docalibration(device_manager,intrinsics_devices,extriniscs_device, chessboar
 	# Estimate the pose of the chessboard in the world coordinate using the Kabsch Method
 	try:
 		calibrated_device_count = 0
-
+		intrinsics_devices,extriniscs_device = device_manager.get_intrisic_and_extrinsic()
 		while calibrated_device_count < 1: #len(device_manager._available_devices)
 			state,frames,_ = device_manager.pull_for_frames()
 			if state:
 				pose_estimator = PoseEstimation(frames, intrinsics_devices,extriniscs_device, chessboard_params)
-				transformation_result_kabsch, corners3D,immagine = pose_estimator.perform_pose_estimation()
+				transformation_result_kabsch, corners3D,_ = pose_estimator.perform_pose_estimation()
 				#object_point, _ = pose_estimator.get_chessboard_corners_in3d()
 				calibrated_device_count = 0
 
@@ -40,14 +39,12 @@ def docalibration(device_manager,intrinsics_devices,extriniscs_device, chessboar
 
 		# Save the transformation object for all devices in an array to use for measurements
 
-		chessboard_points_cumulative_3d = np.array([-1,-1,-1]).transpose()
-
 		transformation_device= transformation_result_kabsch[1].inverse()
 		t = Transformation(translation_vector = -np.array(shiftcalibration))
 		mf = np.dot(t.get_matrix(),transformation_device.get_matrix())
 		transformation_device.set_matrix(mf)
 
-		roi_2D = calibration_roi # get_boundary_corners_2D(chessboard_points_cumulative_3d)
+		roi_2D = calibration_roi
 
 		save_calibration_json(transformation_device, roi_2D, path)
 
@@ -69,15 +66,18 @@ def domulticalibration(device_managers,intrinsics_devices,extriniscs_devices, ch
 
 	try:
 		calibrated_device_count = 0
-
+		intrinsics_devices = {}
+		extrinsics_devices = {}
 		transformation_results_kabsch = {}
+		for key, device in device_managers.items():
+			intrinsics_devices[key],extrinsics_devices[key] = device.get_intrisic_and_extrinsic()
 		while calibrated_device_count < len(device_managers):
 			calibrated_device_count = 0
 			for key, device in device_managers.items():
 
 				state,frames,_ = device.pull_for_frames()
 				if state:
-					pose_estimator = PoseEstimation(frames, intrinsics_devices[key],extriniscs_devices[key], chessboard_params)
+					pose_estimator = PoseEstimation(frames, intrinsics_devices[key],extrinsics_devices[key], chessboard_params)
 					print(f"[{key}] : PERFORM POSE ESTIMATION")
 					transformation_results_kabsch[key], corners3D,_ = pose_estimator.perform_pose_estimation()
 					#object_point, _ = pose_estimator.get_chessboard_corners_in3d()
@@ -104,11 +104,11 @@ def domulticalibration(device_managers,intrinsics_devices,extriniscs_devices, ch
 	except Exception as e:
 		print(e)
 
-def check_calibration_exist(path = "./"):
+def check_calibration_exist(idname,path = "./"):
 
 	if not os.path.isfile(get_roi_2D_name(path)):
 		return False
-	if not os.path.isfile(get_calibration_name(path)):
+	if not os.path.isfile(get_calibration_name(path,idname)):
 		return False
 	return True
 
