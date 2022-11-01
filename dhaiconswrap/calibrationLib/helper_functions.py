@@ -95,11 +95,16 @@ def cv_find_chessboard(color_frame, chessboard_params):
 		corners = cv2.cornerSubPix(color_to_gray, corners, (5,5),(-1,-1), criteria)
 		corners = np.transpose(corners, (2,0,1))
 		if corners is not None:
+			first = True
 			cornersBis = corners.squeeze()
 			cornersBis = cornersBis.T
 			for corner in cornersBis:
-				cv2.circle(color_copy,corner.astype(int),2,(0,255,0),-1)
-		cv2.imwrite('./chessboard.png',color_copy)
+				if not first:
+					cv2.circle(color_copy,corner.astype(int),2,(0,255,0),-1)
+				else:
+					cv2.circle(color_copy,corner.astype(int),2,(0,0,255),-1)
+					first = False
+
 	return chessboard_found, corners, color_copy
 
 

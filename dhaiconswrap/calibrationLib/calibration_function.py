@@ -1,10 +1,10 @@
 import os
 import json
 import numpy as np
-
+import cv2
 from .calibration_kabsch import PoseEstimation, Transformation
 
-def docalibration(device_manager, chessboard_params, calibration_roi, shiftcalibration, path = "./"):
+def docalibration(device_manager, chessboard_params, calibration_roi, shiftcalibration,verbose=False, path = "./"):
 	'''
 	#This function is used to calibrate one or more cameras in 3D space.\n
 	input:\n
@@ -23,13 +23,17 @@ def docalibration(device_manager, chessboard_params, calibration_roi, shiftcalib
 			state,frames,_ = device_manager.pull_for_frames()
 			if state:
 				pose_estimator = PoseEstimation(frames, intrinsics_devices,extriniscs_device, chessboard_params)
-				transformation_result_kabsch, corners3D,_ = pose_estimator.perform_pose_estimation()
+				if device_manager.verbose or verbose:
+					transformation_result_kabsch, corners3D,chessboard_image = pose_estimator.perform_pose_estimation()
+					cv2.imwrite("chessboard_corners_finded.png",chessboard_image)
+				else:
+					transformation_result_kabsch, corners3D,_ = pose_estimator.perform_pose_estimation()
 				#object_point, _ = pose_estimator.get_chessboard_corners_in3d()
 				calibrated_device_count = 0
 
-				if not transformation_result_kabsch[0]:
+				if not transformation_result_kabsch[0] and corners3D is None:
 					print("Place the chessboard on the plane where the object needs to be detected..")
-				else:
+				elif transformation_result_kabsch[0]:
 					calibrated_device_count += 1
 
 		# Save the transformation object for all devices in an array to use for measurements
@@ -47,7 +51,7 @@ def docalibration(device_manager, chessboard_params, calibration_roi, shiftcalib
 	except Exception as e:
 		print(e)
 
-def domulticalibration(device_managers, chessboard_params, calibration_roi, shiftcalibration, path = "./"):
+def domulticalibration(device_managers, chessboard_params, calibration_roi, shiftcalibration,verbose=False,path = "./"):
 	'''
 	#This function is used to calibrate more then one cameras in 3D space.\n
 	input:\n
@@ -73,18 +77,22 @@ def domulticalibration(device_managers, chessboard_params, calibration_roi, shif
 				if state:
 					pose_estimator = PoseEstimation(frames, intrinsics_devices[key],extrinsics_devices[key], chessboard_params)
 					print(f"[{key}] : PERFORM POSE ESTIMATION")
-					transformation_results_kabsch[key], corners3D,_ = pose_estimator.perform_pose_estimation()
+					if device.verbose or verbose:
+						transformation_results_kabsch[key], corners3D,chessboard_image = pose_estimator.perform_pose_estimation()
+						cv2.imwrite(f"chessboard_corners_finded_{key}.png",chessboard_image)
+					else:
+						transformation_results_kabsch[key], corners3D,_ = pose_estimator.perform_pose_estimation()
 					#object_point, _ = pose_estimator.get_chessboard_corners_in3d()
 
-					if not transformation_results_kabsch[key][0]:
+					if not transformation_results_kabsch[key][0] and transformation_results_kabsch[key][1] is None:
 						print(f"For DEVICE: {key} ==>")
 						print("Place the chessboard on the plane where the object needs to be detected..")
-					else:
+					elif transformation_results_kabsch[key][0]:
 						calibrated_device_count += 1
 
 		# Save the transformation object for all devices in an array to use for measurements
 		transformation_devices = {}
-		for key,transformation_result_kabsch in transformation_results_kabsch.itmes():
+		for key,transformation_result_kabsch in transformation_results_kabsch.items():
 			transformation_device= transformation_result_kabsch[1].inverse()
 			t = Transformation(translation_vector = -np.array(shiftcalibration))
 			mf = np.dot(t.get_matrix(),transformation_device.get_matrix())

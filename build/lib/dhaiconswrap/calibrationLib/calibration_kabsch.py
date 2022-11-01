@@ -226,13 +226,12 @@ class PoseEstimation:
 			#check for sufficient points
 			if valid_object_points.shape[1] < 5:
 				print("Not enough points have a valid depth for calculating the transformation")
-				
 			else:
 				[rotation_matrix, translation_vector, rmsd_value] = calculate_transformation_kabsch(valid_object_points, valid_observed_object_points)
 				retval =[True, Transformation(rotation_matrix, translation_vector), points2D, rmsd_value]
 				print("RMS error for calibration is :", rmsd_value, "m")
 
-				if rmsd_value > 0.03:
+				if rmsd_value > 0.004:
 					print("RMS error for calibration is too high: retry")
 					retval[0] = False
 

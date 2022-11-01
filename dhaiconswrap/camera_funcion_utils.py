@@ -10,6 +10,18 @@ class BlobException(Exception):
 	def __init__(self,message):
 		super(BlobException,self).__init__(message)
 
+############################ DECORETORS ###########################################
+
+def infoprint(func):
+	def wrapper(*args):
+		if args[-1]:
+			print(f"[INFO]: {func.__name__} Start")
+			func(*args)
+			print(f"[INFO]: {func.__name__} End")
+		else:
+			func(*args)
+	return wrapper
+
 ############################ HELP FUNCTIONS ###########################################
 
 def get_available_devices():

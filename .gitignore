@@ -1,3 +1,6 @@
 /__pycache__
 /dhaiconswrap/calibrationLib/__pycache__
 /dhaiconswrap/pointclouds_utils/__pycache__
+*.json
+*.png
+prova.py

@@ -11,17 +11,31 @@ try:
 except:
 	print('Impossible to import Transformation class from ..calibrationLib.calibration_kabsch ')
 
-from .camera_funcion_utils import BlobException,IntrinsicParameters,create_pointcloud_manager
+from .camera_funcion_utils import BlobException,infoprint,IntrinsicParameters,create_pointcloud_manager
 
 class DeviceManager():
+	'''
+	INPUT:\n
+		size: Image size (w,h)\n
+		fps: frame per seconds \n
+		deviceid: default is None, name of the device\n
+		nn_mode: bool, if true the internal NN pipline will be created\n
+		calibration_mode: bool, if true the device will be enabled for calibration purpose \n
+		blob_path: path to the .blob nn net file\n
+		verbose: If True, show all the initialization functions pipeline for debugging.\n
+				 If the device is used for calibration purpose, an image with the chessboard corner green coloured will be saved in the home path folder!
+	'''
 
-	def __init__(self,size=(640,480),fps=30,deviceid = None,nn_mode=False,calibration_mode = False,blob_path=None):
+	def __init__(self,size:tuple[int,int]=(640,480),fps:int =30,deviceid: str = None,
+				nn_mode:bool=False,calibration_mode:bool= False,
+				blob_path:str=None,verbose:bool = False):
 		self.pipeline = dhai.Pipeline()
 		self.size = size
 		self.fps = fps
 		self.deviceId = deviceid
 		self.nn_active = nn_mode
 		self.calibration = calibration_mode
+		self.verbose = verbose
 		self.zmmconversion = 1000
 		self.BLOB_PATH = blob_path
 		self._configure_device()
@@ -29,10 +43,18 @@ class DeviceManager():
 
 	def _configure_device(self):
 
-		self._configure_rgb_sensor()
-		self._configure_depth_sensor()
+		self._configure_rgb_sensor(self.verbose)
+		self._configure_depth_sensor(self.verbose)
+	
 	
 	def enable_device(self):
+		self._enable_device(self.verbose)
+	
+	def disable_device(self):
+		self._disable_device(self.verbose)
+
+	@infoprint
+	def _enable_device(self,verbose):
 		if self.deviceId is None:
 			self.device_ = dhai.Device(self.pipeline,usb2Mode=True)
 		else:
@@ -49,6 +71,14 @@ class DeviceManager():
 		self.get_extrinsic()
 		calibration_info = [self.intrinsic_info['RGB'],self.intrinsic_info['RIGHT'],self.extrinsic_info]
 		self.pointcloud_manager = create_pointcloud_manager('first_camera',calibration_info)
+	
+	@infoprint
+	def _disable_device(self,verbose):
+		self.device_.close()
+		if self.deviceId is not None:
+			print(f"[{self.deviceId}] Device has been disabled!")
+		else:
+			print("[DEVICE]: Device has been disabled!")
 
 	def _set_output_queue(self):
 		self.q_rgb = self.device_.getOutputQueue("rgb",maxSize = 1,blocking = False)
@@ -119,8 +149,8 @@ class DeviceManager():
 #region CONFIGURATION SENSORS FUNCTION
 		
 	############################ RGB SENSOR CONFIGURATION FUNCTIONS ############################
-
-	def _configure_rgb_sensor(self):
+	@infoprint
+	def _configure_rgb_sensor(self,verbose):
 
 			cam_rgb = self.pipeline.create(dhai.node.ColorCamera)
 			cam_rgb.setResolution(dhai.ColorCameraProperties.SensorResolution.THE_1080_P) #To change the resolution
@@ -135,13 +165,13 @@ class DeviceManager():
 			xout_rgb.setStreamName("rgb")
 			cam_rgb.preview.link(xout_rgb.input)
 			if self.nn_active:
-				manip,_= self._configure_image_manipulator(self.pipeline)
+				manip,_= self._configure_image_manipulator(self.pipeline,verbose)
 				cam_rgb.preview.link(manip.inputImage)
 				if self.BLOB_PATH is None:
 					raise(BlobException(" BLOB PATH NOT SELECTED!! Please select the path to .blob files"))
-				self._configure_nn_node(manip,self.pipeline,self.BLOB_PATH)
-
-	def _configure_image_manipulator(self,pipeline):
+				self._configure_nn_node(manip,self.pipeline,self.BLOB_PATH,verbose)
+	@infoprint
+	def _configure_image_manipulator(self,pipeline,verbose):
 
 		manip = pipeline.create(dhai.node.ImageManip)
 		manipOut = pipeline.create(dhai.node.XLinkOut)
@@ -152,7 +182,8 @@ class DeviceManager():
 		
 		return manip,manipOut
 
-	def _configure_nn_node(self,manip,pipeline,blob_path):
+	@infoprint
+	def _configure_nn_node(self,manip,pipeline,blob_path,verbose):
 			
 			nn = pipeline.create(dhai.node.MobileNetDetectionNetwork)
 			nnOut = pipeline.create(dhai.node.XLinkOut)
@@ -166,8 +197,8 @@ class DeviceManager():
 			nn.out.link(nnOut.input)
 
 	############################ DEPTH CONFIGURATION FUNCTIONS ############################
-
-	def _configure_depth_sensor(self):
+	@infoprint
+	def _configure_depth_sensor(self,verbose):
 
 		monoLeft = self.pipeline.create(dhai.node.MonoCamera)
 		monoRight = self.pipeline.create(dhai.node.MonoCamera)
@@ -176,7 +207,7 @@ class DeviceManager():
 		xout_depth.setStreamName("depth")
 		xout_disparity = self.pipeline.create(dhai.node.XLinkOut)
 		xout_disparity.setStreamName("disparity")
-		self._configure_depth_proprieties(monoLeft,monoRight,depth,self.calibration)
+		self._configure_depth_properties(monoLeft,monoRight,depth,self.calibration,verbose)
 		if self.calibration:
 			depth.setDepthAlign(dhai.CameraBoardSocket.RGB)
 		monoLeft.out.link(depth.left)
@@ -184,7 +215,8 @@ class DeviceManager():
 		depth.disparity.link(xout_disparity.input)
 		depth.depth.link(xout_depth.input)
 
-	def _configure_depth_proprieties(self,left,right,depth,calibration):
+	@infoprint
+	def _configure_depth_properties(self,left,right,depth,calibration,verbose):
 
 		if not calibration:
 			left.setResolution(dhai.MonoCameraProperties.SensorResolution.THE_480_P)
