@@ -12,6 +12,7 @@ def docalibration(device_manager, chessboard_params, calibration_roi, shiftcalib
 	- chessboard_params: [n_corners_along_h, n_corners_along_w, square_size]\n
 	- calibration_roi: Region of interest\n
 	- shiftcalibration: a vector if there is a shift of the calibration\n
+	- verbose: bool, if True a chessboard image with corners colored in green will be saved in home path
 	- path: the path where the .json file with calibration parameters (trasportation matrix) is stored\n
 	'''
 	# Set the chessboard parameters for calibration 
@@ -31,7 +32,7 @@ def docalibration(device_manager, chessboard_params, calibration_roi, shiftcalib
 				#object_point, _ = pose_estimator.get_chessboard_corners_in3d()
 				calibrated_device_count = 0
 
-				if not transformation_result_kabsch[0] and corners3D is None:
+				if not transformation_result_kabsch[0] and transformation_result_kabsch[1] is None:
 					print("Place the chessboard on the plane where the object needs to be detected..")
 				elif transformation_result_kabsch[0]:
 					calibrated_device_count += 1
@@ -101,7 +102,7 @@ def domulticalibration(device_managers, chessboard_params, calibration_roi, shif
 
 		roi_2D = calibration_roi
 
-		save_calibration_json(transformation_device, roi_2D, path)
+		save_calibration_json(transformation_devices, roi_2D, path)
 		return corners3D
 	except Exception as e:
 		print(e)
@@ -144,11 +145,11 @@ def get_roi_2D_name(path):
 
 def save_calibration_json(transformation_devices, roi_2D, path = "./"):
 	
-	if transformation_devices is dict:
-		transformation_device = transformation_devices
-		mat = transformation_device.get_matrix()
-		with open(get_calibration_name(path), 'w') as outfile:
-			json.dump(mat.tolist(), outfile)
+	if type(transformation_devices) is dict:
+		for key,transformation_device in transformation_devices.items():
+			mat = transformation_device.get_matrix()
+			with open(get_calibration_name(path,key), 'w') as outfile:
+				json.dump(mat.tolist(), outfile)
 	else:
 		transformation_device = transformation_devices
 		mat = transformation_device.get_matrix()

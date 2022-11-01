@@ -232,7 +232,7 @@ class PoseEstimation:
 				print("RMS error for calibration is :", rmsd_value, "m")
 
 				if rmsd_value > 0.004:
-					print("RMS error for calibration is too high: retry")
+					print("RMS error for calibration is too high <<greater than 0.004 m>>: retry")
 					retval[0] = False
 
 		return retval, corners3D, color_to_send
