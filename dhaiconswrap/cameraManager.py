@@ -70,7 +70,7 @@ class DeviceManager():
 		self.get_intrinsic()
 		self.get_extrinsic()
 		calibration_info = [self.intrinsic_info['RGB'],self.intrinsic_info['RIGHT'],self.extrinsic_info]
-		self.pointcloud_manager = create_pointcloud_manager('first_camera',calibration_info)
+		self.pointcloud_manager = create_pointcloud_manager(self.deviceId,calibration_info)
 	
 	@infoprint
 	def _disable_device(self,verbose):
@@ -276,7 +276,7 @@ class DeviceManager():
 
 	def set_conversion_depth(self,conv_factor):
 		'''
-			default value is 1000 which means the output will be in mm as default
+			default value is 1000 which means the output will be in m as default
 		'''
 		self.zmmconversion = conv_factor
 
@@ -291,7 +291,7 @@ class DeviceManager():
 			image_to_write: image where the average position is written
 			points_cloud_dat: the points cloud results, stored inside a dictionary as in results \n
 							obtained using the pull for frames method\n
-			detections: list of detections\n
+			detections: list of detections [class,probability,[xmin,ymin,xmax,ymax]]\n
 			offset: default = 10, the offset from the center of the detection to take the points cloud value\n
 					and averaging them to output the position in the space of the object\n
 			Output:\n
@@ -300,6 +300,7 @@ class DeviceManager():
 		cordinates = []
 		xyz_points = points_cloud_data['XYZ_map_valid']
 		for detection in detections:
+			assert (len(detection[2]) == 4),"bounding box cordinate need to be at the 3rd position of the detection list"
 			xmin,ymin,xmax,ymax = detection[2]
 			xcenter = (xmin+((xmax-xmin)//2))
 			ycenter = (ymin+((ymax-ymin)//2))
@@ -309,9 +310,9 @@ class DeviceManager():
 			if useful_value.size == 0:
 				continue 
 			elif useful_value.shape[0] >1:
-				avg_pos_obj = np.mean(useful_value,axis=0)*1000
+				avg_pos_obj = np.mean(useful_value,axis=0)*self.zmmconversion
 			else:
-				avg_pos_obj= useful_value[0]*1000
+				avg_pos_obj= useful_value[0]*self.zmmconversion
 			avg_pos_obj = avg_pos_obj.astype(int)
 			if not np.all(avg_pos_obj == 0):
 				cordinates.append(avg_pos_obj.tolist())

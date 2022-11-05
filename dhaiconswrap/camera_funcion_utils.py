@@ -35,10 +35,7 @@ def get_available_devices():
 
 def create_pointcloud_manager(id=None,calibrationInfo=None):
 
-	if id is None:
-		pointcloud_manager = PointsCloudManager('None')
-	else:
-		pointcloud_manager = PointsCloudManager('None')
+	pointcloud_manager = PointsCloudManager(id)
 	if not check_calibration_exist(idname=id):
 		return None
 	calibration_info,roi_2D,viewROI = load_calibration_json(id=id)
