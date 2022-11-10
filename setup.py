@@ -2,14 +2,14 @@ from setuptools import setup,find_packages
 
 setup(
 	name='dhaiconswrap',
-	version='0.2.3',    
+	version='0.2.4',    
 	description='A depthai wrapper with calibration and points cloud functions',
 	url='https://github.com/AntonioConsiglio/dhaiconswrap',
 	author='Antonio Consiglio',
 	author_email='consiglio.antonio.bi@gmail.com',
 	license='MIT',
 	packages= find_packages(),
-	install_requires=['depthai>=2.15.0.0',
+	install_requires=['depthai==2.17.0.0',
 					'numpy>=1.22.1',
 					'opencv-python>=4.5.5.64',
 					'opencv-contrib-python>=4.5.5.64',                     

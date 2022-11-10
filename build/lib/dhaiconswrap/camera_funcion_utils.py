@@ -10,10 +10,12 @@ except:
 
 ############################ CONSTANT ###########################################
 
-# COLOR_RESOLUTIONS = {"400":dhai.MonoCameraProperties.SensorResolution.THE_400_P,
-# 					"480":dhai.MonoCameraProperties.SensorResolution.THE_480_P,
-# 					"720":dhai.MonoCameraProperties.SensorResolution.THE_720_P,
-# 					"800":dhai.MonoCameraProperties.SensorResolution.THE_800_P}
+COLOR_RESOLUTIONS = {"720":dhai.ColorCameraProperties.SensorResolution.THE_720_P,
+					 "800":dhai.ColorCameraProperties.SensorResolution.THE_800_P,
+					 "1080":dhai.ColorCameraProperties.SensorResolution.THE_1080_P,
+					 "4K":dhai.ColorCameraProperties.SensorResolution.THE_4_K,
+					 "12MP":dhai.ColorCameraProperties.SensorResolution.THE_12_MP,
+					 "13MP":dhai.ColorCameraProperties.SensorResolution.THE_13_MP,}
 
 DEPTH_RESOLUTIONS = {"400":dhai.MonoCameraProperties.SensorResolution.THE_400_P,
 					"480":dhai.MonoCameraProperties.SensorResolution.THE_480_P,
@@ -54,8 +56,9 @@ def get_available_devices():
 	return cameras_id
 
 def create_depthconf_json(path):
-	configuration = {"SensorResolution":480,    
-					"SensorResolution_calibration":480,
+	configuration = {"ColorSensorResolution":"1080",
+					"SensorResolution":"480",    
+					"SensorResolution_calibration":"480",
 					"MedianFilterKernel":5,
 					"LeftRightCheck":True,
 					"ExtendedDisparity": True,

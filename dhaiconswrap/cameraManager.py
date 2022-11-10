@@ -18,7 +18,7 @@ from .camera_funcion_utils import BlobException, \
 								  IntrinsicParameters,\
 								  create_pointcloud_manager, \
 								  create_depthconf_json, \
-								  DEPTH_RESOLUTIONS,MEDIAN_KERNEL
+								  DEPTH_RESOLUTIONS,MEDIAN_KERNEL,COLOR_RESOLUTIONS
 
 if not "camera_configuration.json" in os.listdir(os.getcwd()):
 	create_depthconf_json(os.path.join(os.getcwd(),"18443010D1456C1200_camera_configuration.json"))
@@ -51,6 +51,7 @@ class DeviceManager():
 		self.nn_active = nn_mode
 		self.calibration = calibration_mode
 		self.verbose = verbose
+		self.depth_error = False
 		self.zmmconversion = 1000
 		self.BLOB_PATH = blob_path
 		self.depthconfig = self._load_configuration(config_path)
@@ -74,21 +75,21 @@ class DeviceManager():
 				configfile = json.load(jsonfile)
 		return configfile
 
-	def enable_device(self):
-		self._enable_device(self.verbose)
+	def enable_device(self,usb2Mode:bool=False):
+		self._enable_device(usb2Mode,self.verbose)
 	
 	def disable_device(self):
 		self._disable_device(self.verbose)
 
 	@infoprint
-	def _enable_device(self,verbose):
+	def _enable_device(self,usb2Mode,verbose):
 		if self.deviceId is None:
-			self.device_ = dhai.Device(self.pipeline,usb2Mode=True)
+			self.device_ = dhai.Device(self.pipeline,usb2Mode=usb2Mode)
 		else:
 			found, device_info = dhai.Device.getDeviceByMxId(self.deviceId)
 			if not found:
 				raise RuntimeError("Device not found!")
-			self.device_ = dhai.Device(self.pipeline,device_info,usb2Mode=True)
+			self.device_ = dhai.Device(self.pipeline,device_info,usb2Mode=usb2Mode)
 		if self.nn_active:
 			self.max_disparity = self.node_list[8].initialConfig.getMaxDisparity()
 		else:
@@ -179,7 +180,7 @@ class DeviceManager():
 	def _configure_rgb_sensor(self,verbose):
 
 			cam_rgb = self.pipeline.create(dhai.node.ColorCamera)
-			cam_rgb.setResolution(dhai.ColorCameraProperties.SensorResolution.THE_1080_P) #To change the resolution
+			cam_rgb.setResolution(COLOR_RESOLUTIONS[self.depthconfig["ColorSensorResolution"]]) #To change the resolution
 			if self.calibration:
 				pass
 				#cam_rgb.initialControl.setManualFocus(130) # If you want to fix the focus during calibration
@@ -245,14 +246,14 @@ class DeviceManager():
 	def _configure_depth_properties(self,left,right,depth,calibration,verbose):
 	
 		if not calibration:
-			left.setResolution(DEPTH_RESOLUTIONS[str(self.depthconfig["SensorResolution"])])
+			left.setResolution(DEPTH_RESOLUTIONS[self.depthconfig["SensorResolution"]])
 			left.setBoardSocket(dhai.CameraBoardSocket.LEFT)
-			right.setResolution(DEPTH_RESOLUTIONS[str(self.depthconfig["SensorResolution"])])
+			right.setResolution(DEPTH_RESOLUTIONS[self.depthconfig["SensorResolution"]])
 			right.setBoardSocket(dhai.CameraBoardSocket.RIGHT)
 		else:
-			left.setResolution(DEPTH_RESOLUTIONS[str(self.depthconfig["SensorResolution_calibration"])])
+			left.setResolution(DEPTH_RESOLUTIONS[self.depthconfig["SensorResolution_calibration"]])
 			left.setBoardSocket(dhai.CameraBoardSocket.LEFT)
-			right.setResolution(DEPTH_RESOLUTIONS[str(self.depthconfig["SensorResolution_calibration"])])
+			right.setResolution(DEPTH_RESOLUTIONS[self.depthconfig["SensorResolution_calibration"]])
 			right.setBoardSocket(dhai.CameraBoardSocket.RIGHT)
 
 
@@ -309,9 +310,17 @@ class DeviceManager():
 		self.zmmconversion = conv_factor
 
 	def _convert_depth(self,depth):
+		h,w = depth.shape
 		depth = depth.flatten()/self.zmmconversion
-		depth = np.reshape(depth,(self.size[1],self.size[0]))
-		return depth
+		if not self.depth_error:
+			try:
+				depth = np.reshape(depth,(self.size[1],self.size[0]))
+				return depth
+			except Exception as e:
+				print(f"[{__name__} - Depth Warning: ]",e)
+				return np.reshape(depth,(h,w))
+		return np.reshape(depth,(h,w))
+		
 
 	def determinate_object_location(self,image_to_write,points_cloud_data,detections,offset=10):
 		'''
