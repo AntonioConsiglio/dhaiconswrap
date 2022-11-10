@@ -1,9 +1,31 @@
 import depthai as dhai
+import cv2
+import numpy as np
+import json
 try:
 	from .pointclouds_utils.pointclouds_manager import PointsCloudManager
 	from .calibrationLib.calibration_function import load_calibration_json,check_calibration_exist
 except:
 	print('PointsCloudManager not loaded within calibration functions')
+
+############################ CONSTANT ###########################################
+
+# COLOR_RESOLUTIONS = {"400":dhai.MonoCameraProperties.SensorResolution.THE_400_P,
+# 					"480":dhai.MonoCameraProperties.SensorResolution.THE_480_P,
+# 					"720":dhai.MonoCameraProperties.SensorResolution.THE_720_P,
+# 					"800":dhai.MonoCameraProperties.SensorResolution.THE_800_P}
+
+DEPTH_RESOLUTIONS = {"400":dhai.MonoCameraProperties.SensorResolution.THE_400_P,
+					"480":dhai.MonoCameraProperties.SensorResolution.THE_480_P,
+					"720":dhai.MonoCameraProperties.SensorResolution.THE_720_P,
+					"800":dhai.MonoCameraProperties.SensorResolution.THE_800_P}
+
+MEDIAN_KERNEL = {"0":dhai.MedianFilter.MEDIAN_OFF,
+				 "3":dhai.MedianFilter.KERNEL_3x3,
+				 "5":dhai.MedianFilter.KERNEL_5x5,
+				 "7":dhai.MedianFilter.KERNEL_7x7}
+
+
 ############################ CUSTOM EXCEPTIONS ###########################################
 
 class BlobException(Exception):
@@ -31,17 +53,36 @@ def get_available_devices():
 	print(f'[CAMERAS FOUNDED] : {cameras_id}')
 	return cameras_id
 
+def create_depthconf_json(path):
+	configuration = {"SensorResolution":480,    
+					"SensorResolution_calibration":480,
+					"MedianFilterKernel":5,
+					"LeftRightCheck":True,
+					"ExtendedDisparity": True,
+					"Subpixel":False,
+					"speckleFilter": False,
+					"speckleRange":50,
+					"temporalFilter":True,
+					"spatialFilter":True,
+					"holeFillingRadius":2,
+					"numIterations":1,
+					"thresholdFilter_minRange":300,
+					"thresholdFilter_maxRange":650,
+					"decimationFactor":1}
+	with open(path,"w") as configfile:
+		json.dump(configuration,configfile)
+
 	############################ POINTCLOUD MANAGER FUNCTIONS ############################
 
-def create_pointcloud_manager(id=None,calibrationInfo=None):
+def create_pointcloud_manager(id=None,calibrationInfo=None,zdirection=False):
 
 	pointcloud_manager = PointsCloudManager(id)
 	if not check_calibration_exist(idname=id):
 		return None
-	calibration_info,roi_2D,viewROI = load_calibration_json(id=id)
+	calibration_info,roi_2D,viewROI,zdirection = load_calibration_json(id=id)
 	pointcloud_manager.viewROI = viewROI
 	calibrationInfo.append(calibration_info)
-	pointcloud_manager.SetParameters(calibrationInfo,roi_2D,viewROI)
+	pointcloud_manager.SetParameters(calibrationInfo,roi_2D,viewROI,zdirection)
 
 	return pointcloud_manager
 
@@ -57,4 +98,69 @@ class IntrinsicParameters():
 		self.cy = intrinsic_info[1][2]
 		self.h = size[1]
 		self.w = size[0]
+
+	## IMAGE PLOTTING
+
+def visualise_Axes(color_image, calibration_info_devices, len_axes = 0.10):
+
+		
+	bounding_box_points_devices = create_axis_draw_points(calibration_info_devices, len_axes)
+
+	points = bounding_box_points_devices.astype(int)
+	origin = points[0]
+
+	xend = points[1]
+	x_color = (255,0,0)
+	cv2.line(color_image, (origin[0],origin[1]), (xend[0],xend[1]), x_color, 2)
+	cv2.putText(color_image, "X", (xend[0],xend[1]), cv2.FONT_HERSHEY_PLAIN, 2, x_color )
+
+	yend = points[3]
+	y_color = (0,255,0)
+	cv2.line(color_image, (origin[0],origin[1]), (yend[0],yend[1]), y_color, 2)
+	cv2.putText(color_image, "Y", (yend[0],yend[1]), cv2.FONT_HERSHEY_PLAIN, 2, y_color )
+
+	zend = points[5]
+	z_color = (0,0,255)
+	cv2.line(color_image, (origin[0],origin[1]), (zend[0],zend[1]), z_color, 2)
+	cv2.putText(color_image, "Z", (zend[0],zend[1]), cv2.FONT_HERSHEY_PLAIN, 2, z_color )
+
+	return color_image
+
+def create_draw_points(bounding_box_world_3d, calibration_info_devices):
+
+# Get the bounding box points in the image coordinates
+	bounding_box_points_color_image = Convert3Dto2DImage(calibration_info_devices,bounding_box_world_3d.T)
+
+	return bounding_box_points_color_image
+
+
+def make_axis_points(len_axes = 0.02):
+	x = [0, len_axes, 0, 0, 0, 0]
+	y = [0, 0, 0, len_axes, 0, 0]
+	z = [0, 0, 0, 0, 0, len_axes]
+	return np.stack([x, y, z],1)
+
+
+def create_axis_draw_points(calibration_info_devices, len_axes = 0.02):
+	bounding_box_world_3d = make_axis_points(len_axes)
+	return create_draw_points(bounding_box_world_3d, calibration_info_devices)
+
+def Convert3Dto2DImage(calibration_info,bounding_box_world_3d):
+
+	T0 = calibration_info[3] #Transformation(trasformation_mat = calibration_info[3])
+	color_intrinsics = calibration_info[0]
+	T2 = calibration_info[2] #Transformation(trasformation_mat = calibration_info[2])
+
+	bounding_box_device_3d = T0.inverse().apply_transformation(bounding_box_world_3d)
+	bounding_box_device_3d_RGB = T2.apply_transformation(np.array(bounding_box_device_3d))
+
+	z_RGB = bounding_box_device_3d_RGB[2,:]
+	x_RGB = np.divide(bounding_box_device_3d_RGB[0,:],z_RGB)
+	y_RGB = np.divide(bounding_box_device_3d_RGB[1,:],z_RGB)
+
+	u = (x_RGB * color_intrinsics.fx + color_intrinsics.cx).astype(int)
+	v = (y_RGB * color_intrinsics.fy + color_intrinsics.cy).astype(int) 
+	
+	return np.stack([u,v],0).astype(int).T
+
 

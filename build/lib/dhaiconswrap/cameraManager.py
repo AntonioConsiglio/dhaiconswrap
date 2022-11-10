@@ -4,14 +4,29 @@ except:
 	print('depthai library is not installed!!')
 	print('Install depthai library ... "pip install depthai"')
 import cv2
+import os
 import numpy as np
+import json
 
 try:
 	from .calibrationLib.calibration_kabsch import Transformation
 except:
 	print('Impossible to import Transformation class from ..calibrationLib.calibration_kabsch ')
 
-from .camera_funcion_utils import BlobException,infoprint,IntrinsicParameters,create_pointcloud_manager
+from .camera_funcion_utils import BlobException, \
+								  infoprint,\
+								  IntrinsicParameters,\
+								  create_pointcloud_manager, \
+								  create_depthconf_json, \
+								  DEPTH_RESOLUTIONS,MEDIAN_KERNEL
+
+if not "camera_configuration.json" in os.listdir(os.getcwd()):
+	create_depthconf_json(os.path.join(os.getcwd(),"18443010D1456C1200_camera_configuration.json"))
+	create_depthconf_json(os.path.join(os.getcwd(),"camera_configuration.json"))
+	print("""##################################################################################### \n
+[WARNING MESSAGE] : A camera configuration file was created with default setting because
+			this file is used to configure the stereo camera! \n
+#####################################################################################""")
 
 class DeviceManager():
 	'''
@@ -28,7 +43,7 @@ class DeviceManager():
 
 	def __init__(self,size:tuple[int,int]=(640,480),fps:int =30,deviceid: str = None,
 				nn_mode:bool=False,calibration_mode:bool= False,
-				blob_path:str=None,verbose:bool = False):
+				blob_path:str=None,verbose:bool = False,config_path:str = './'):
 		self.pipeline = dhai.Pipeline()
 		self.size = size
 		self.fps = fps
@@ -38,6 +53,7 @@ class DeviceManager():
 		self.verbose = verbose
 		self.zmmconversion = 1000
 		self.BLOB_PATH = blob_path
+		self.depthconfig = self._load_configuration(config_path)
 		self._configure_device()
 		self.node_list = self.pipeline.getNodeMap()
 
@@ -46,7 +62,18 @@ class DeviceManager():
 		self._configure_rgb_sensor(self.verbose)
 		self._configure_depth_sensor(self.verbose)
 	
-	
+	def _load_configuration(self,jpath):
+		configfile = None
+		if self.deviceId is None:
+			jpath = os.path.join(jpath,"camera_configuration.json")
+			with open(jpath) as jsonfile:
+				configfile = json.load(jsonfile)
+			return configfile
+		jpath = os.path.join(jpath,f"{self.deviceId}_camera_configuration.json")
+		with open(jpath) as jsonfile:
+				configfile = json.load(jsonfile)
+		return configfile
+
 	def enable_device(self):
 		self._enable_device(self.verbose)
 	
@@ -127,7 +154,6 @@ class DeviceManager():
 														APPLY_ROI=False,
 														Kdecimation=1,
 														ZmmConversion=1,
-														depth_threshold=0.001,
 														viewROI=self.pointcloud_manager.viewROI
 														)
 				if nn_foto is not None:
@@ -217,37 +243,39 @@ class DeviceManager():
 
 	@infoprint
 	def _configure_depth_properties(self,left,right,depth,calibration,verbose):
-
+	
 		if not calibration:
-			left.setResolution(dhai.MonoCameraProperties.SensorResolution.THE_480_P)
+			left.setResolution(DEPTH_RESOLUTIONS[str(self.depthconfig["SensorResolution"])])
 			left.setBoardSocket(dhai.CameraBoardSocket.LEFT)
-			right.setResolution(dhai.MonoCameraProperties.SensorResolution.THE_480_P)
+			right.setResolution(DEPTH_RESOLUTIONS[str(self.depthconfig["SensorResolution"])])
 			right.setBoardSocket(dhai.CameraBoardSocket.RIGHT)
 		else:
-			left.setResolution(dhai.MonoCameraProperties.SensorResolution.THE_480_P)
+			left.setResolution(DEPTH_RESOLUTIONS[str(self.depthconfig["SensorResolution_calibration"])])
 			left.setBoardSocket(dhai.CameraBoardSocket.LEFT)
-			right.setResolution(dhai.MonoCameraProperties.SensorResolution.THE_480_P)
+			right.setResolution(DEPTH_RESOLUTIONS[str(self.depthconfig["SensorResolution_calibration"])])
 			right.setBoardSocket(dhai.CameraBoardSocket.RIGHT)
 
 
 		# Create a node that will produce the depth map (using disparity output as it's easier to visualize depth this way)
 		depth.setDefaultProfilePreset(dhai.node.StereoDepth.PresetMode.HIGH_DENSITY)
 		# Options: MEDIAN_OFF, KERNEL_3x3, KERNEL_5x5, KERNEL_7x7 (default)
-		depth.initialConfig.setMedianFilter(dhai.MedianFilter.KERNEL_5x5)
-		depth.setLeftRightCheck(True)
-		depth.setExtendedDisparity(True)
-		depth.setSubpixel(False)
+		depth.initialConfig.setMedianFilter(MEDIAN_KERNEL[str(self.depthconfig["MedianFilterKernel"])])
+		depth.setLeftRightCheck(self.depthconfig["LeftRightCheck"])
+		if self.depthconfig["ExtendedDisparity"] and self.depthconfig["Subpixel"]:
+			raise Exception("Is not possible to use Subpixel with ExtendedDisparity !")
+		depth.setExtendedDisparity(self.depthconfig["ExtendedDisparity"])
+		depth.setSubpixel(self.depthconfig["Subpixel"])
 
 		config = depth.initialConfig.get()
-		config.postProcessing.speckleFilter.enable = False
-		config.postProcessing.speckleFilter.speckleRange = 50
-		config.postProcessing.temporalFilter.enable = True
-		config.postProcessing.spatialFilter.enable = True
-		config.postProcessing.spatialFilter.holeFillingRadius = 2
-		config.postProcessing.spatialFilter.numIterations = 1
-		config.postProcessing.thresholdFilter.minRange = 300
-		config.postProcessing.thresholdFilter.maxRange = 650
-		config.postProcessing.decimationFilter.decimationFactor = 1
+		config.postProcessing.speckleFilter.enable = self.depthconfig["speckleFilter"]
+		config.postProcessing.speckleFilter.speckleRange = self.depthconfig["speckleRange"]
+		config.postProcessing.temporalFilter.enable = self.depthconfig["temporalFilter"]
+		config.postProcessing.spatialFilter.enable = self.depthconfig["spatialFilter"]
+		config.postProcessing.spatialFilter.holeFillingRadius = self.depthconfig["holeFillingRadius"]
+		config.postProcessing.spatialFilter.numIterations = self.depthconfig["numIterations"]
+		config.postProcessing.thresholdFilter.minRange = self.depthconfig["thresholdFilter_minRange"]
+		config.postProcessing.thresholdFilter.maxRange = self.depthconfig["thresholdFilter_maxRange"]
+		config.postProcessing.decimationFilter.decimationFactor = self.depthconfig["decimationFactor"]
 		depth.initialConfig.set(config)
 
 #endregion
@@ -321,6 +349,7 @@ class DeviceManager():
 					cv2.putText(image_to_write,f"x: {x} mm",(xcenter+8,ycenter-30),cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,0,0),2)
 					cv2.putText(image_to_write,f'y: {y} mm',(xcenter+8,ycenter-15),cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,0,0),2)
 					cv2.putText(image_to_write,f'z: {z} mm',(xcenter+8,ycenter),cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,0,0),2)
+					cv2.rectangle(image_to_write,(xmin,ymin),(xmax,ymax),(0,0,255),2)
 				except Exception as e:
 					print(f"[CALCULATE OBJECT LOCATION]: {e}")
 			

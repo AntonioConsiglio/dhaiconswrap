@@ -28,14 +28,17 @@ def CalculatePointsCloudParameters(calibration_info, roi_2D, viewROIcoords):
 
 	return color_intrinsics, depth2color_trans, camera2world_mat, roi_2D, x_norm, y_norm, w, h, ROI_valid
 
-def CalculatePointsCloud(depth_image, color_image, pars, addinfo,device,APPLY_ROI,
-							Kdecimation,ZmmConversion,depth_threshold,viewROI):
+def CalculatePointsCloud(depth_image, color_image, pars, addinfo,APPLY_ROI,zdirection,
+							options,Kdecimation,ZmmConversion,viewROI):
 	'''
 		pars = parameters based on CalculatePointsCloudParameters
 		addinfo = dizionario proveniente dalla captazione di eventi da tastiera \n durante il running del codice per visualizzare o no qualcosa.
 	'''
 	#ptvsd.debug_this_thread()
 	color_intrinsics, depth2color_trans, cam2world_mat, roi_2D, x_norm, y_norm, w, h, viewROI_map = pars
+	if options is None:
+		options = [5,0.0]
+	valid_depth,depth_threshold = options
 	if APPLY_ROI:
 		viewROI_map_color = viewROI_map.reshape((h,w))
 		newH = np.max(np.sum(viewROI_map_color,axis=0))
@@ -54,8 +57,7 @@ def CalculatePointsCloud(depth_image, color_image, pars, addinfo,device,APPLY_RO
 	if APPLY_ROI:
 		filter_valid = np.nonzero(np.logical_and(z > 0, z < 5000) & viewROI_map)[0]
 	else:
-		#filter_valid = np.nonzero(np.logical_and(z > 0, z < 5000))[0]
-		filter_valid = np.nonzero(np.logical_and(z > 0, z < 0.650))[0]
+		filter_valid = np.nonzero(np.logical_and(z > 0, z <valid_depth))[0]
 
 
 	if Kdecimation > 1:
@@ -76,7 +78,10 @@ def CalculatePointsCloud(depth_image, color_image, pars, addinfo,device,APPLY_RO
 	XYZ_world_cloud_valid = cam2world_mat.apply_transformation(point_cloud_xyz)
 
 	# calculate points index based on z. The z coord direction in pointing to lower, so coords shall be negative
-	filter0 = XYZ_world_cloud_valid[2, :] <-depth_threshold
+	if zdirection:
+		filter0 = XYZ_world_cloud_valid[2, :] >depth_threshold
+	else:
+		filter0 = XYZ_world_cloud_valid[2, :] <-depth_threshold
 	XYZ_world_cloud_valid = XYZ_world_cloud_valid[:,filter0]
 	XYZ_cloud_valid = point_cloud_xyz[:,filter0]
 

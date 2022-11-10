@@ -13,14 +13,17 @@ class PointsCloudManager:
 		self.id = id
 		self._HasData = False
 		self.pars = None
+		self.zdirection = None
+		self.options = None
 
-	def SetParameters(self, calibration_info,roi_2D,viewROI):
+	def SetParameters(self, calibration_info,roi_2D,viewROI,zdirection):
+		self.calibration_info = calibration_info
+		self.zdirection = zdirection
 		self.pars = CalculatePointsCloudParameters(calibration_info, roi_2D, viewROI)
 
 
 	def PointsCloudManagerStartCalculation(self,depth_image,color_image,APPLY_ROI,
-											Kdecimation,ZmmConversion,
-											depth_threshold,viewROI):
+											Kdecimation,ZmmConversion,viewROI):
 
 		if self.pars is not None:
 
@@ -28,12 +31,13 @@ class PointsCloudManager:
 										  color_image,
 										  self.pars,
 										  [],
-										  self.id,
 										  APPLY_ROI,
+										  self.zdirection,
+										  self.options,
 										  Kdecimation,
 										  ZmmConversion,
-										  depth_threshold,
-										  viewROI)
+										  viewROI,
+										  )
 			if result:
 				self._hasresult(result)
 			
@@ -46,6 +50,13 @@ class PointsCloudManager:
 
 	def HasData(self):
 		return self._HasData
+
+	def set_options(self,depth_valid: float,z_threshold:float):
+		"""
+		- depth_valid: by default expressed in meters, define the max value of depth to consider.
+		- z_threshold: by default expressed in meters, define the min value of z cordinate to consider.
+		"""
+		self.options = [depth_valid,z_threshold]
 
 	def PointsCloudManagerGetResult(self):
 		if self._HasData:
