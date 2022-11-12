@@ -143,7 +143,7 @@ class PoseEstimation:
 		self.deep_to_rgb_extrinsic = extrinsic
 		self.chessboard_params = chessboard_params		
 
-	def get_chessboard_corners_in3d(self):
+	def get_chessboard_corners_in3d(self,show_disparity):
 		"""
 		Searches the chessboard corners in the grayscale images of 
 		the connected device and uses the information in the 
@@ -167,9 +167,11 @@ class PoseEstimation:
 		color_intrinsics = self.intrinsic['RGB']
 		depth_frame = self.frames['depth']
 		color_image = self.frames['color_image']
+		if show_disparity:
+			cv2.imshow("Current Disparity",cv2.resize(self.frames['disparity_image'],(0,0),fx=0.5,fy=0.5))
+			cv2.waitKey(1)
 		found_corners, points2D, color_to_send = cv_find_chessboard(color_image, self.chessboard_params)
-		# cv2.imshow('chessborad_find',color_to_send)
-		# cv2.waitKey(10)
+		
 		corners3D = [found_corners, None, None, None]
 		try:
 			if found_corners:
@@ -190,7 +192,7 @@ class PoseEstimation:
 		return corners3D, color_to_send
 
 
-	def perform_pose_estimation(self):
+	def perform_pose_estimation(self,show_disparity=False):
 		"""
 		Calculates the extrinsic calibration from the coordinate space of the camera to the 
 		coordinate space spanned by a chessboard by retrieving the 3d coordinates of the 
@@ -213,7 +215,7 @@ class PoseEstimation:
 				Root mean square deviation between the observed chessboard corners and 
 				the corners in the local coordinate system after transformation
 		"""
-		corners3D, color_to_send = self.get_chessboard_corners_in3d()
+		corners3D, color_to_send = self.get_chessboard_corners_in3d(show_disparity)
 		corners3D = self.transform_3Dcamera_to_3Ddeepth(corners3D)
 		found_corners, points2D, points3D, validPoints =  corners3D
 		objectpoints = get_chessboard_points_3D(self.chessboard_params)

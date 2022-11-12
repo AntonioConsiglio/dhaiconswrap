@@ -3,5 +3,10 @@
 /dhaiconswrap/pointclouds_utils/__pycache__
 *.json
 *.png
+/blob_path
 prova.py
 /pippo
+/.vscode
+/dhaiconswrap.egg-info
+/build
+/dist

@@ -40,10 +40,11 @@ def infoprint(func):
 	def wrapper(*args):
 		if args[-1]:
 			print(f"[INFO]: {func.__name__} Start")
-			func(*args)
+			res = func(*args)
 			print(f"[INFO]: {func.__name__} End")
 		else:
-			func(*args)
+			res = func(*args)
+		return res
 	return wrapper
 
 ############################ HELP FUNCTIONS ###########################################
@@ -57,8 +58,8 @@ def get_available_devices():
 
 def create_depthconf_json(path):
 	configuration = {"ColorSensorResolution":"1080",
-					"SensorResolution":"480",    
-					"SensorResolution_calibration":"480",
+					"StereoSensorResolution":"480",    
+					"StereoSensorResolution_calibration":"480",
 					"MedianFilterKernel":5,
 					"LeftRightCheck":True,
 					"ExtendedDisparity": True,
@@ -70,19 +71,19 @@ def create_depthconf_json(path):
 					"holeFillingRadius":2,
 					"numIterations":1,
 					"thresholdFilter_minRange":300,
-					"thresholdFilter_maxRange":650,
+					"thresholdFilter_maxRange":1500,
 					"decimationFactor":1}
 	with open(path,"w") as configfile:
-		json.dump(configuration,configfile)
+		json.dump(configuration,configfile,indent=1)
 
 	############################ POINTCLOUD MANAGER FUNCTIONS ############################
 
-def create_pointcloud_manager(id=None,calibrationInfo=None,zdirection=False):
+def create_pointcloud_manager(id=None,calibrationInfo=None,path="./"):
 
 	pointcloud_manager = PointsCloudManager(id)
-	if not check_calibration_exist(idname=id):
+	if not check_calibration_exist(idname=id,path=path):
 		return None
-	calibration_info,roi_2D,viewROI,zdirection = load_calibration_json(id=id)
+	calibration_info,roi_2D,viewROI,zdirection = load_calibration_json(path=path,id=id)
 	pointcloud_manager.viewROI = viewROI
 	calibrationInfo.append(calibration_info)
 	pointcloud_manager.SetParameters(calibrationInfo,roi_2D,viewROI,zdirection)

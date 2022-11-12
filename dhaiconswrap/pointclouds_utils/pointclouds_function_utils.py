@@ -2,7 +2,7 @@ import numpy as np
 import time
 
 def CalculatePointsCloudParameters(calibration_info, roi_2D, viewROIcoords):
-	#ptvsd.debug_this_thread()
+
 	depth_intrinsics = calibration_info[1]
 	color_intrinsics = calibration_info[0]
 	depth2color_extrinsics_mat = calibration_info[2]
@@ -11,7 +11,6 @@ def CalculatePointsCloudParameters(calibration_info, roi_2D, viewROIcoords):
 	h = depth_intrinsics.h
 
 	depth2color_trans = depth2color_extrinsics_mat# Transformation(trasformation_mat = depth2color_extrinsics_mat)
-	#camera2world_mat = Transformation(trasformation_mat = camera2world_mat)
 
 	nx = np.linspace(0, w-1, w)
 	ny = np.linspace(0, h-1, h)
@@ -28,11 +27,10 @@ def CalculatePointsCloudParameters(calibration_info, roi_2D, viewROIcoords):
 
 	return color_intrinsics, depth2color_trans, camera2world_mat, roi_2D, x_norm, y_norm, w, h, ROI_valid
 
-def CalculatePointsCloud(depth_image, color_image, pars, addinfo,APPLY_ROI,zdirection,
+def CalculatePointsCloud(depth_image, color_image, pars,APPLY_ROI,zdirection,
 							options,Kdecimation,ZmmConversion,viewROI):
 	'''
 		pars = parameters based on CalculatePointsCloudParameters
-		addinfo = dizionario proveniente dalla captazione di eventi da tastiera \n durante il running del codice per visualizzare o no qualcosa.
 	'''
 	#ptvsd.debug_this_thread()
 	color_intrinsics, depth2color_trans, cam2world_mat, roi_2D, x_norm, y_norm, w, h, viewROI_map = pars
@@ -130,19 +128,14 @@ def CalculatePointsCloud(depth_image, color_image, pars, addinfo,APPLY_ROI,zdire
 
 	pointcloud_results = {}
 
-	pointcloud_results['color_image'] = color_image
 	if APPLY_ROI:
 		pointcloud_results['color_image_video'] = viewROI
 	else:
 		pointcloud_results['color_image_video'] = viewROI
-	pointcloud_results['depth_image'] = depth_image
 	pointcloud_results['XYZ_world_cloud_valid'] = XYZ_world_cloud_valid
 	pointcloud_results['RGB_cloud_valid'] = RGB_cloud_valid
 	pointcloud_results['XYZ_map_valid'] = XYZ_map_valid
 	pointcloud_results['RGB_map_valid'] = RGB_map_valid
-	pointcloud_results['inittime'] = 0
-	pointcloud_results['addinfo'] = addinfo
-	pointcloud_results['dodetection'] = True
 
 	return pointcloud_results
 

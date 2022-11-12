@@ -30,7 +30,6 @@ class PointsCloudManager:
 			result = CalculatePointsCloud(depth_image,
 										  color_image,
 										  self.pars,
-										  [],
 										  APPLY_ROI,
 										  self.zdirection,
 										  self.options,

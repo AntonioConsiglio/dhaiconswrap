@@ -54,14 +54,16 @@ class DeviceManager():
 		self.depth_error = False
 		self.zmmconversion = 1000
 		self.BLOB_PATH = blob_path
+		self.config_path = config_path
 		self.depthconfig = self._load_configuration(config_path)
 		self._configure_device()
 		self.node_list = self.pipeline.getNodeMap()
 
 	def _configure_device(self):
 
-		self._configure_rgb_sensor(self.verbose)
-		self._configure_depth_sensor(self.verbose)
+		cam_rgb = self._configure_rgb_sensor(self.verbose)
+		left,right = self._configure_depth_sensor(self.verbose)
+		self._configure_controls(cam_rgb,left,right,self.verbose)
 	
 	def _load_configuration(self,jpath):
 		configfile = None
@@ -98,7 +100,10 @@ class DeviceManager():
 		self.get_intrinsic()
 		self.get_extrinsic()
 		calibration_info = [self.intrinsic_info['RGB'],self.intrinsic_info['RIGHT'],self.extrinsic_info]
-		self.pointcloud_manager = create_pointcloud_manager(self.deviceId,calibration_info)
+		path = "./"
+		if self.config_path is not None:
+			path = self.config_path
+		self.pointcloud_manager = create_pointcloud_manager(self.deviceId,calibration_info,path=path)
 	
 	@infoprint
 	def _disable_device(self,verbose):
@@ -109,18 +114,22 @@ class DeviceManager():
 			print("[DEVICE]: Device has been disabled!")
 
 	def _set_output_queue(self):
-		self.q_rgb = self.device_.getOutputQueue("rgb",maxSize = 1,blocking = False)
-		self.q_depth = self.device_.getOutputQueue("depth",maxSize = 1,blocking = False)
-		self.q_disparity = self.device_.getOutputQueue("disparity",maxSize=1,blocking=False)
+		self.q_rgb = self.device_.getOutputQueue("rgb",maxSize = 4,blocking = False)
+		self.q_depth = self.device_.getOutputQueue("depth",maxSize = 4,blocking = False)
+		self.q_disparity = self.device_.getOutputQueue("disparity",maxSize=4,blocking=False)
+		self.q_left = self.device_.getOutputQueue("left",maxSize=4,blocking=False)
+		self.q_right = self.device_.getOutputQueue("right",maxSize=4,blocking=False)
+		self.q_rgbcontrol = self.device_.getInputQueue("rgb_control")
+		self.q_monoscontrol = self.device_.getInputQueue("monos_control")
 		if self.nn_active:
-			self.q_nn = self.device_.getOutputQueue('neural',maxSize=1,blocking=False)
-			self.q_nn_input = self.device_.getOutputQueue('neural_input',maxSize=1,blocking=False)
+			self.q_nn = self.device_.getOutputQueue('neural',maxSize=4,blocking=False)
+			self.q_nn_input = self.device_.getOutputQueue('neural_input',maxSize=4,blocking=False)
 	
-	def pull_for_frames(self):
+	def pull_for_frames(self,get_pointscloud=True,write_detections=True):
 		'''
 		- output:\n
 			frame_state: bool \n
-			frames: dict[color_image,depth,disparity_image]
+			frames: dict[color_image,depth,disparity_image,monos_image]
 			results: dict['points_cloud_data','detections']
 		'''
 		frames = {}
@@ -131,6 +140,8 @@ class DeviceManager():
 			rgb_foto = self.q_rgb.tryGet()
 			depth = self.q_depth.get()
 			disparity_frame = self.q_disparity.get()
+			left_frame = self.q_left.get()
+			right_frame = self.q_right.get()
 			nn_foto = None
 			if self.nn_active:
 				nn_foto = self.q_nn_input.tryGet()
@@ -145,11 +156,12 @@ class DeviceManager():
 				state_frame = True
 				frames['color_image'] = rgb_foto.getCvFrame()
 				frames['depth'] = self._convert_depth(depth.getFrame())
-				frames['disparity_image'] = disparity_frame.getFrame()#*(255 /self.max_disparity)).astype(np.uint8)
+				frames['disparity_image'] = disparity_frame.getFrame()
+				frames["monos_image"]= {"left":left_frame.getCvFrame(),"right":right_frame.getCvFrame()}
 				results = {}
 				results['points_cloud_data'] = None
 				results['detections'] = None
-				if self.pointcloud_manager is not None:
+				if self.pointcloud_manager is not None and get_pointscloud:
 					results['points_cloud_data'] = self.pointcloud_manager.PointsCloudManagerStartCalculation(depth_image=frames['depth'],
 														color_image=frames['color_image'],
 														APPLY_ROI=False,
@@ -161,8 +173,8 @@ class DeviceManager():
 					frames['nn_input'] = nn_foto.getCvFrame()
 					if detections is not None:
 						results['detections'] = self._normalize_detections(detections)
-						self._write_detections_on_image(frames['color_image'],results['detections'])
-						
+						if write_detections:
+							self._write_detections_on_image(frames['color_image'],results['detections'])	
 				return state_frame,frames,results
 			else:
 				frame_count += 1
@@ -174,6 +186,19 @@ class DeviceManager():
 		return self.intrinsic_info,self.extrinsic_info
 
 #region CONFIGURATION SENSORS FUNCTION
+
+	############################ CONTROLS CONFIGURATION ############################
+	@infoprint
+	def _configure_controls(self,cam_rgb,left,right,verbose):
+
+		rgb_control = self.pipeline.create(dhai.node.XLinkIn)
+		rgb_control.setStreamName('rgb_control')
+		rgb_control.out.link(cam_rgb.inputControl)
+
+		monos_control = self.pipeline.create(dhai.node.XLinkIn)
+		monos_control.setStreamName('monos_control')
+		monos_control.out.link(left.inputControl)
+		monos_control.out.link(right.inputControl)
 		
 	############################ RGB SENSOR CONFIGURATION FUNCTIONS ############################
 	@infoprint
@@ -181,9 +206,6 @@ class DeviceManager():
 
 			cam_rgb = self.pipeline.create(dhai.node.ColorCamera)
 			cam_rgb.setResolution(COLOR_RESOLUTIONS[self.depthconfig["ColorSensorResolution"]]) #To change the resolution
-			if self.calibration:
-				pass
-				#cam_rgb.initialControl.setManualFocus(130) # If you want to fix the focus during calibration
 			cam_rgb.setPreviewSize(self.size) # to change the output size
 			cam_rgb.setBoardSocket(dhai.CameraBoardSocket.RGB)
 			cam_rgb.setInterleaved(False)
@@ -191,12 +213,13 @@ class DeviceManager():
 			xout_rgb = self.pipeline.create(dhai.node.XLinkOut)
 			xout_rgb.setStreamName("rgb")
 			cam_rgb.preview.link(xout_rgb.input)
-			if self.nn_active:
+			if self.nn_active and not self.calibration:
 				manip,_= self._configure_image_manipulator(self.pipeline,verbose)
 				cam_rgb.preview.link(manip.inputImage)
 				if self.BLOB_PATH is None:
 					raise(BlobException(" BLOB PATH NOT SELECTED!! Please select the path to .blob files"))
 				self._configure_nn_node(manip,self.pipeline,self.BLOB_PATH,verbose)
+			return cam_rgb
 	@infoprint
 	def _configure_image_manipulator(self,pipeline,verbose):
 
@@ -237,28 +260,38 @@ class DeviceManager():
 		self._configure_depth_properties(monoLeft,monoRight,depth,self.calibration,verbose)
 		if self.calibration:
 			depth.setDepthAlign(dhai.CameraBoardSocket.RGB)
+			self.nn_active = False
+		monoleft_out = self.pipeline.create(dhai.node.XLinkOut)
+		monoleft_out.setStreamName("left")
+		monoright_out = self.pipeline.create(dhai.node.XLinkOut)
+		monoright_out.setStreamName("right")
 		monoLeft.out.link(depth.left)
+		monoLeft.out.link(monoleft_out.input)
 		monoRight.out.link(depth.right)
+		monoRight.out.link(monoright_out.input)
 		depth.disparity.link(xout_disparity.input)
 		depth.depth.link(xout_depth.input)
+		return monoLeft,monoRight
 
 	@infoprint
 	def _configure_depth_properties(self,left,right,depth,calibration,verbose):
 	
 		if not calibration:
-			left.setResolution(DEPTH_RESOLUTIONS[self.depthconfig["SensorResolution"]])
+			left.setResolution(DEPTH_RESOLUTIONS[self.depthconfig["StereoSensorResolution"]])
 			left.setBoardSocket(dhai.CameraBoardSocket.LEFT)
-			right.setResolution(DEPTH_RESOLUTIONS[self.depthconfig["SensorResolution"]])
+			right.setResolution(DEPTH_RESOLUTIONS[self.depthconfig["StereoSensorResolution"]])
 			right.setBoardSocket(dhai.CameraBoardSocket.RIGHT)
 		else:
-			left.setResolution(DEPTH_RESOLUTIONS[self.depthconfig["SensorResolution_calibration"]])
+			left.setResolution(DEPTH_RESOLUTIONS[self.depthconfig["StereoSensorResolution_calibration"]])
 			left.setBoardSocket(dhai.CameraBoardSocket.LEFT)
-			right.setResolution(DEPTH_RESOLUTIONS[self.depthconfig["SensorResolution_calibration"]])
+			right.setResolution(DEPTH_RESOLUTIONS[self.depthconfig["StereoSensorResolution_calibration"]])
 			right.setBoardSocket(dhai.CameraBoardSocket.RIGHT)
 
 
 		# Create a node that will produce the depth map (using disparity output as it's easier to visualize depth this way)
 		depth.setDefaultProfilePreset(dhai.node.StereoDepth.PresetMode.HIGH_DENSITY)
+		if self.calibration:
+			depth.setOutputSize(self.size[0],self.size[1])
 		# Options: MEDIAN_OFF, KERNEL_3x3, KERNEL_5x5, KERNEL_7x7 (default)
 		depth.initialConfig.setMedianFilter(MEDIAN_KERNEL[str(self.depthconfig["MedianFilterKernel"])])
 		depth.setLeftRightCheck(self.depthconfig["LeftRightCheck"])
@@ -278,6 +311,7 @@ class DeviceManager():
 		config.postProcessing.thresholdFilter.maxRange = self.depthconfig["thresholdFilter_maxRange"]
 		config.postProcessing.decimationFilter.decimationFactor = self.depthconfig["decimationFactor"]
 		depth.initialConfig.set(config)
+		
 
 #endregion
 
@@ -364,6 +398,44 @@ class DeviceManager():
 			
 		return cordinates
 #endregion 
+
+	def _isinsidelimit(self,val,minval,maxval):
+		return max(minval,min(val,maxval))
+
+	def set_rgb_exposure(self,exposure:int=None,iso:int=None,region:list[int,int,int,int]=None):
+		control = dhai.CameraControl()
+		if exposure is None and iso is None:
+			control.setAutoExposureEnable()
+			if region is not None:
+				control.setAutoExposureRegion(*region)
+			self.q_rgbcontrol.send(control)
+			return
+		exposure = int(self._isinsidelimit(exposure,1,33000))
+		iso = int(self._isinsidelimit(iso,100,1600))
+		control.setManualExposure(exposure,iso)
+		self.q_rgbcontrol.send(control)
+
+	def set_focus(self,focus_value:int=None):
+		control = dhai.CameraControl()
+		if focus_value is None:
+			return
+		control.setManualFocus(focus_value)
+		self.q_rgbcontrol.send(control)
+		self.q_monoscontrol.send(control)
+
+	def set_monos_exposure(self,exposure:int=None,iso:int=None,region:list[int,int,int,int]=None):
+		control = dhai.CameraControl()
+		if exposure is None and iso is None:
+			control.setAutoExposureEnable()
+			if region is not None:
+				control.setAutoExposureRegion(*region)
+			self.q_monoscontrol.send(control)
+			return
+		exposure = int(self._isinsidelimit(exposure,1,33000))
+		iso = int(self._isinsidelimit(iso,100,1600))
+		control.setManualExposure(exposure,iso)
+		self.q_monoscontrol.send(control)
+
 
 	def get_intrinsic(self):
 		self.intrinsic_info = {}

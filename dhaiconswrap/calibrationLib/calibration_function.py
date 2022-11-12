@@ -26,7 +26,7 @@ def docalibration(device_manager, chessboard_params, calibration_roi, shiftcalib
 			if state:
 				pose_estimator = PoseEstimation(frames, intrinsics_devices,extriniscs_device, chessboard_params)
 				if device_manager.verbose or verbose:
-					transformation_result_kabsch, corners3D,chessboard_image = pose_estimator.perform_pose_estimation()
+					transformation_result_kabsch, corners3D,chessboard_image = pose_estimator.perform_pose_estimation(True)
 					cv2.imwrite("chessboard_corners_finded.png",chessboard_image)
 				else:
 					transformation_result_kabsch, corners3D,_ = pose_estimator.perform_pose_estimation()
@@ -85,7 +85,7 @@ def domulticalibration(device_managers, chessboard_params, calibration_roi, shif
 					pose_estimator = PoseEstimation(frames, intrinsics_devices[key],extrinsics_devices[key], chessboard_params)
 					print(f"[{key}] : PERFORM POSE ESTIMATION")
 					if device.verbose or verbose:
-						transformation_results_kabsch[key], corners3D,chessboard_image = pose_estimator.perform_pose_estimation()
+						transformation_results_kabsch[key], corners3D,chessboard_image = pose_estimator.perform_pose_estimation(True)
 						cv2.imwrite(f"chessboard_corners_finded_{key}.png",chessboard_image)
 					else:
 						transformation_results_kabsch[key], corners3D,_ = pose_estimator.perform_pose_estimation()
@@ -98,6 +98,7 @@ def domulticalibration(device_managers, chessboard_params, calibration_roi, shif
 						calibrated_device_count += 1
 
 		# Save the transformation object for all devices in an array to use for measurements
+		cv2.destroyAllWindows()
 		transformation_devices = {}
 		for key,transformation_result_kabsch in transformation_results_kabsch.items():
 			transformation_device= transformation_result_kabsch[1].inverse()
@@ -127,20 +128,20 @@ def check_calibration_exist(idname,path = "./"):
 def load_calibration_json(path = "./",id=None):
 
 	if id is None:
-		with open('camera_calibration.json') as json_file:
+		with open(os.path.join(path,'camera_calibration.json'),"r") as json_file:
 			file = json.load(json_file)
 			pose_mat = np.array(file['extrinsic_matrix'])
 			transformation_devices = Transformation(pose_mat[:3,:3],pose_mat[:3,3])
 			zdirection = file['zdirection']
 	else:
-		with open(f'{id}_camera_calibration.json','r') as json_file:
+		with open(os.path.join(path,f'{id}_camera_calibration.json'),'r') as json_file:
 			file = json.load(json_file)
 			pose_mat = np.array(file['extrinsic_matrix'])
 			transformation_devices = Transformation(pose_mat[:3,:3],pose_mat[:3,3])
 			zdirection = file['zdirection']
 
 
-	with open('roi_2D.json') as json_file:
+	with open(os.path.join(path,'roi_2D.json'),"r") as json_file:
 		roi_2D = json.load(json_file)
 		
 	viewROI = roi_2D
