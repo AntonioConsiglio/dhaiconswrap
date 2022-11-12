@@ -27,7 +27,7 @@ def docalibration(device_manager, chessboard_params, calibration_roi, shiftcalib
 				pose_estimator = PoseEstimation(frames, intrinsics_devices,extriniscs_device, chessboard_params)
 				if device_manager.verbose or verbose:
 					transformation_result_kabsch, corners3D,chessboard_image = pose_estimator.perform_pose_estimation(True)
-					cv2.imwrite("chessboard_corners_finded.png",chessboard_image)
+					cv2.imwrite("chessboard_corners_found.png",chessboard_image)
 				else:
 					transformation_result_kabsch, corners3D,_ = pose_estimator.perform_pose_estimation()
 				#object_point, _ = pose_estimator.get_chessboard_corners_in3d()
@@ -86,7 +86,7 @@ def domulticalibration(device_managers, chessboard_params, calibration_roi, shif
 					print(f"[{key}] : PERFORM POSE ESTIMATION")
 					if device.verbose or verbose:
 						transformation_results_kabsch[key], corners3D,chessboard_image = pose_estimator.perform_pose_estimation(True)
-						cv2.imwrite(f"chessboard_corners_finded_{key}.png",chessboard_image)
+						cv2.imwrite(f"chessboard_corners_found_{key}.png",chessboard_image)
 					else:
 						transformation_results_kabsch[key], corners3D,_ = pose_estimator.perform_pose_estimation()
 					#object_point, _ = pose_estimator.get_chessboard_corners_in3d()
