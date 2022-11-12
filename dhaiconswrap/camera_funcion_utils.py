@@ -72,7 +72,9 @@ def create_depthconf_json(path):
 					"numIterations":1,
 					"thresholdFilter_minRange":300,
 					"thresholdFilter_maxRange":1500,
-					"decimationFactor":1}
+					"decimationFactor":1,
+					"nn_threshold":0.5,
+ 					"nn_size":[300,300]}
 	with open(path,"w") as configfile:
 		json.dump(configuration,configfile,indent=1)
 
