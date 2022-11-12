@@ -1,7 +1,5 @@
 from .pointclouds_function_utils import *
 
-#import ptvsd
-
 class PointsCloudManager:
 	def __init__(self,id):
 
@@ -22,33 +20,21 @@ class PointsCloudManager:
 		self.pars = CalculatePointsCloudParameters(calibration_info, roi_2D, viewROI)
 
 
-	def PointsCloudManagerStartCalculation(self,depth_image,color_image,APPLY_ROI,
-											Kdecimation,ZmmConversion,viewROI):
+	def StartCalculation(self,frames):
 
 		if self.pars is not None:
 
-			result = CalculatePointsCloud(depth_image,
-										  color_image,
+			result = CalculatePointsCloud(frames["depth"],
+										  frames["color_image"],
 										  self.pars,
-										  APPLY_ROI,
+										  False,
 										  self.zdirection,
 										  self.options,
-										  Kdecimation,
-										  ZmmConversion,
-										  viewROI,
+										  Kdecimation=1,
+										  ZmmConversion=1,
+										  viewROI=self.viewROI,
 										  )
-			if result:
-				self._hasresult(result)
-			
 			return result
-
-	def _hasresult(self,results):
-		self.data = results
-		self._HasData = True
-
-
-	def HasData(self):
-		return self._HasData
 
 	def set_options(self,depth_valid: float,z_threshold:float):
 		"""
@@ -56,11 +42,4 @@ class PointsCloudManager:
 		- z_threshold: by default expressed in meters, define the min value of z cordinate to consider.
 		"""
 		self.options = [depth_valid,z_threshold]
-
-	def PointsCloudManagerGetResult(self):
-		if self._HasData:
-			self._HasData = False
-			return self.data
-		else:
-			return None
 

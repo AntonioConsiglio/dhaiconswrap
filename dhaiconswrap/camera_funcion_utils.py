@@ -82,7 +82,9 @@ def create_pointcloud_manager(id=None,calibrationInfo=None,path="./"):
 
 	pointcloud_manager = PointsCloudManager(id)
 	if not check_calibration_exist(idname=id,path=path):
-		return None
+		calibrationInfo.append(None)
+		pointcloud_manager.SetParameters(calibrationInfo,None,None,True)
+		return pointcloud_manager
 	calibration_info,roi_2D,viewROI,zdirection = load_calibration_json(path=path,id=id)
 	pointcloud_manager.viewROI = viewROI
 	calibrationInfo.append(calibration_info)
@@ -138,29 +140,35 @@ def create_draw_points(bounding_box_world_3d, calibration_info_devices):
 	return bounding_box_points_color_image
 
 
-def make_axis_points(len_axes = 0.02):
+def make_axis_points(len_axes):
 	x = [0, len_axes, 0, 0, 0, 0]
 	y = [0, 0, 0, len_axes, 0, 0]
 	z = [0, 0, 0, 0, 0, len_axes]
 	return np.stack([x, y, z],1)
 
 
-def create_axis_draw_points(calibration_info_devices, len_axes = 0.02):
+def create_axis_draw_points(calibration_info_devices, len_axes):
 	bounding_box_world_3d = make_axis_points(len_axes)
 	return create_draw_points(bounding_box_world_3d, calibration_info_devices)
 
 def Convert3Dto2DImage(calibration_info,bounding_box_world_3d):
 
-	T0 = calibration_info[3] #Transformation(trasformation_mat = calibration_info[3])
+	T0 = calibration_info[3]
 	color_intrinsics = calibration_info[0]
-	T2 = calibration_info[2] #Transformation(trasformation_mat = calibration_info[2])
+	T2 = calibration_info[2] 
 
-	bounding_box_device_3d = T0.inverse().apply_transformation(bounding_box_world_3d)
-	bounding_box_device_3d_RGB = T2.apply_transformation(np.array(bounding_box_device_3d))
-
-	z_RGB = bounding_box_device_3d_RGB[2,:]
-	x_RGB = np.divide(bounding_box_device_3d_RGB[0,:],z_RGB)
-	y_RGB = np.divide(bounding_box_device_3d_RGB[1,:],z_RGB)
+	if T0 is not None:
+		bounding_box_device_3d = T0.inverse().apply_transformation(bounding_box_world_3d)
+		bounding_box_device_3d_RGB = T2.apply_transformation(np.array(bounding_box_device_3d))
+		z_RGB = bounding_box_device_3d_RGB[2,:]
+		x_RGB = np.divide(bounding_box_device_3d_RGB[0,:],z_RGB)
+		y_RGB = np.divide(bounding_box_device_3d_RGB[1,:],z_RGB)
+	else:
+		bounding_box_device_3d = bounding_box_world_3d
+		bounding_box_device_3d_RGB = T2.apply_transformation(bounding_box_device_3d)
+		z_RGB = bounding_box_device_3d_RGB[2,:]
+		x_RGB = bounding_box_device_3d_RGB[0,:]
+		y_RGB = bounding_box_device_3d_RGB[1,:]
 
 	u = (x_RGB * color_intrinsics.fx + color_intrinsics.cx).astype(int)
 	v = (y_RGB * color_intrinsics.fy + color_intrinsics.cy).astype(int) 

@@ -10,8 +10,6 @@ def CalculatePointsCloudParameters(calibration_info, roi_2D, viewROIcoords):
 	w = depth_intrinsics.w
 	h = depth_intrinsics.h
 
-	depth2color_trans = depth2color_extrinsics_mat# Transformation(trasformation_mat = depth2color_extrinsics_mat)
-
 	nx = np.linspace(0, w-1, w)
 	ny = np.linspace(0, h-1, h)
 	u, v = np.meshgrid(nx, ny)
@@ -22,10 +20,13 @@ def CalculatePointsCloudParameters(calibration_info, roi_2D, viewROIcoords):
 	y_norm = (v_flat - depth_intrinsics.cy)/depth_intrinsics.fy
 
 	ROI_valid = np.zeros((h, w), dtype=bool)
-	ROI_valid[viewROIcoords[1]:viewROIcoords[3],viewROIcoords[0]:viewROIcoords[2]] = True
+	if viewROIcoords is not None:
+		ROI_valid[viewROIcoords[1]:viewROIcoords[3],viewROIcoords[0]:viewROIcoords[2]] = True
+	else:
+		ROI_valid[0:h-1,0:w-1] = True
 	ROI_valid = ROI_valid.flatten()
 
-	return color_intrinsics, depth2color_trans, camera2world_mat, roi_2D, x_norm, y_norm, w, h, ROI_valid
+	return color_intrinsics, depth2color_extrinsics_mat, camera2world_mat, roi_2D, x_norm, y_norm, w, h, ROI_valid
 
 def CalculatePointsCloud(depth_image, color_image, pars,APPLY_ROI,zdirection,
 							options,Kdecimation,ZmmConversion,viewROI):
@@ -43,7 +44,6 @@ def CalculatePointsCloud(depth_image, color_image, pars,APPLY_ROI,zdirection,
 		newW= np.max(np.sum(viewROI_map_color,axis=1))
 		inittime = time.time()
 
-
 	# create empty arrays
 	RGB_map_valid = np.zeros((h, w, 3), dtype=np.uint8)
 	XYZ_map_valid = np.zeros((h, w, 3), dtype=np.float32)
@@ -53,7 +53,7 @@ def CalculatePointsCloud(depth_image, color_image, pars,APPLY_ROI,zdirection,
 
 	# apply a filter of valid point detected (0 value mean no distance found)
 	if APPLY_ROI:
-		filter_valid = np.nonzero(np.logical_and(z > 0, z < 5000) & viewROI_map)[0]
+		filter_valid = np.nonzero(np.logical_and(z > 0, z < valid_depth) & viewROI_map)[0]
 	else:
 		filter_valid = np.nonzero(np.logical_and(z > 0, z <valid_depth))[0]
 
@@ -73,7 +73,10 @@ def CalculatePointsCloud(depth_image, color_image, pars,APPLY_ROI,zdirection,
 
 	
 	#convert point from camera coords to world coords
-	XYZ_world_cloud_valid = cam2world_mat.apply_transformation(point_cloud_xyz)
+	if cam2world_mat is not None:
+		XYZ_world_cloud_valid = cam2world_mat.apply_transformation(point_cloud_xyz)
+	else:
+		XYZ_world_cloud_valid = point_cloud_xyz #cam2world_mat.apply_transformation(point_cloud_xyz)
 
 	# calculate points index based on z. The z coord direction in pointing to lower, so coords shall be negative
 	if zdirection:
@@ -128,10 +131,7 @@ def CalculatePointsCloud(depth_image, color_image, pars,APPLY_ROI,zdirection,
 
 	pointcloud_results = {}
 
-	if APPLY_ROI:
-		pointcloud_results['color_image_video'] = viewROI
-	else:
-		pointcloud_results['color_image_video'] = viewROI
+	pointcloud_results['ViewROI'] = viewROI
 	pointcloud_results['XYZ_world_cloud_valid'] = XYZ_world_cloud_valid
 	pointcloud_results['RGB_cloud_valid'] = RGB_cloud_valid
 	pointcloud_results['XYZ_map_valid'] = XYZ_map_valid

@@ -18,6 +18,7 @@ from .camera_funcion_utils import BlobException, \
 								  IntrinsicParameters,\
 								  create_pointcloud_manager, \
 								  create_depthconf_json, \
+								  visualise_Axes, \
 								  DEPTH_RESOLUTIONS,MEDIAN_KERNEL,COLOR_RESOLUTIONS
 
 if not "camera_configuration.json" in os.listdir(os.getcwd()):
@@ -162,19 +163,16 @@ class DeviceManager():
 				results['points_cloud_data'] = None
 				results['detections'] = None
 				if self.pointcloud_manager is not None and get_pointscloud:
-					results['points_cloud_data'] = self.pointcloud_manager.PointsCloudManagerStartCalculation(depth_image=frames['depth'],
-														color_image=frames['color_image'],
-														APPLY_ROI=False,
-														Kdecimation=1,
-														ZmmConversion=1,
-														viewROI=self.pointcloud_manager.viewROI
-														)
+					results['points_cloud_data'] = self.pointcloud_manager.StartCalculation(frames)
+
 				if nn_foto is not None:
 					frames['nn_input'] = nn_foto.getCvFrame()
 					if detections is not None:
 						results['detections'] = self._normalize_detections(detections)
 						if write_detections:
 							self._write_detections_on_image(frames['color_image'],results['detections'])	
+							if get_pointscloud:
+								self.__determinate_object_location(frames,results)
 				return state_frame,frames,results
 			else:
 				frame_count += 1
@@ -354,15 +352,52 @@ class DeviceManager():
 				print(f"[{__name__} - Depth Warning: ]",e)
 				return np.reshape(depth,(h,w))
 		return np.reshape(depth,(h,w))
-		
 
-	def determinate_object_location(self,image_to_write,points_cloud_data,detections,offset=10):
+	def __determinate_object_location(self,frames,results,offset=10,draw_box=True):
+		'''
+			FOR INTERNAL SCOPE 		
+		'''
+		image_to_write = frames["color_image"]
+		points_cloud_data = results["points_cloud_data"]
+		detections = results["detections"]
+		cordinates = []
+		xyz_points = points_cloud_data['XYZ_map_valid']
+		for detection in detections:
+			assert (len(detection[2]) == 4),"bounding box cordinate need to be at the 3rd position of the detection list"
+			xmin,ymin,xmax,ymax = detection[2]
+			xcenter = (xmin+((xmax-xmin)//2))
+			ycenter = (ymin+((ymax-ymin)//2))
+			useful_value = xyz_points[ycenter-offset:ycenter+offset,xcenter-offset:xcenter+offset]
+			useful_value = useful_value.reshape((useful_value.shape[0]*useful_value.shape[1],3))
+			useful_value = useful_value[np.any(useful_value != 0,axis=1)]
+			if useful_value.size == 0:
+				continue 
+			elif useful_value.shape[0] >1:
+				avg_pos_obj = np.mean(useful_value,axis=0)*self.zmmconversion
+			else:
+				avg_pos_obj= useful_value[0]*self.zmmconversion
+			avg_pos_obj = avg_pos_obj.astype(int)
+			if not np.all(avg_pos_obj == 0):
+				cordinates.append(avg_pos_obj.tolist())
+				try:
+					x,y,z = avg_pos_obj.tolist()
+					if draw_box:
+						cv2.putText(image_to_write,f"x: {x} mm",(xcenter+8,ycenter-30),cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,0,0),2)
+						cv2.putText(image_to_write,f'y: {y} mm',(xcenter+8,ycenter-15),cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,0,0),2)
+						cv2.putText(image_to_write,f'z: {z} mm',(xcenter+8,ycenter),cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,0,0),2)
+						visualise_Axes(image_to_write,self.pointcloud_manager.calibration_info)
+				except Exception as e:
+					print(f"[CALCULATE OBJECT LOCATION]: {e}")
+			
+	
+	def determinate_object_location(self,image_to_write,points_cloud_data,detections,offset=10,draw_box=True):
 		'''
 			input:\n
 			image_to_write: image where the average position is written
 			points_cloud_dat: the points cloud results, stored inside a dictionary as in results \n
 							obtained using the pull for frames method\n
-			detections: list of detections [class,probability,[xmin,ymin,xmax,ymax]]\n
+			detections: list of detections [[class,probability,[xmin,ymin,xmax,ymax]]]\n
+			results: 
 			offset: default = 10, the offset from the center of the detection to take the points cloud value\n
 					and averaging them to output the position in the space of the object\n
 			Output:\n
@@ -389,10 +424,11 @@ class DeviceManager():
 				cordinates.append(avg_pos_obj.tolist())
 				try:
 					x,y,z = avg_pos_obj.tolist()
-					cv2.putText(image_to_write,f"x: {x} mm",(xcenter+8,ycenter-30),cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,0,0),2)
-					cv2.putText(image_to_write,f'y: {y} mm',(xcenter+8,ycenter-15),cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,0,0),2)
-					cv2.putText(image_to_write,f'z: {z} mm',(xcenter+8,ycenter),cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,0,0),2)
-					cv2.rectangle(image_to_write,(xmin,ymin),(xmax,ymax),(0,0,255),2)
+					if draw_box:
+						cv2.putText(image_to_write,f"x: {x} mm",(xcenter+8,ycenter-30),cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,0,0),2)
+						cv2.putText(image_to_write,f'y: {y} mm',(xcenter+8,ycenter-15),cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,0,0),2)
+						cv2.putText(image_to_write,f'z: {z} mm',(xcenter+8,ycenter),cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,0,0),2)
+						cv2.rectangle(image_to_write,(xmin,ymin),(xmax,ymax),(0,0,255),2)
 				except Exception as e:
 					print(f"[CALCULATE OBJECT LOCATION]: {e}")
 			
@@ -449,7 +485,7 @@ class DeviceManager():
 	def get_extrinsic(self):
 		calibration_info = self.device_.readCalibration()
 		extrin_info = np.array(calibration_info.getCameraExtrinsics(dhai.CameraBoardSocket.RIGHT,dhai.CameraBoardSocket.RGB))
-		extrin_info[:,3] = extrin_info[:,3]/1000 
+		extrin_info[:3,3] = extrin_info[:3,3]/1000 
 		self.extrinsic_info = Transformation(trasformation_mat=extrin_info)
 		return self.extrinsic_info
 
