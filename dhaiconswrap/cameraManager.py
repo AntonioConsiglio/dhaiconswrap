@@ -55,6 +55,7 @@ class DeviceManager():
 		self.depth_error = False
 		self.zmmconversion = 1000
 		self.BLOB_PATH = blob_path
+		self.names = None
 		self.config_path = config_path
 		self.depthconfig = self._load_configuration(config_path)
 		self._configure_device()
@@ -220,11 +221,11 @@ class DeviceManager():
 			return cam_rgb
 	@infoprint
 	def _configure_image_manipulator(self,pipeline,verbose):
-
+		size = self.depthconfig["nn_size"]
 		manip = pipeline.create(dhai.node.ImageManip)
 		manipOut = pipeline.create(dhai.node.XLinkOut)
 		manipOut.setStreamName('neural_input')
-		manip.initialConfig.setResize(300,300)
+		manip.initialConfig.setResize(*size)
 		manip.initialConfig.setFrameType(dhai.ImgFrame.Type.BGR888p)
 		manip.out.link(manipOut.input)
 		
@@ -237,7 +238,7 @@ class DeviceManager():
 			nnOut = pipeline.create(dhai.node.XLinkOut)
 			nnOut.setStreamName("neural")
 			# define nn features
-			nn.setConfidenceThreshold(0.5)
+			nn.setConfidenceThreshold(self.depthconfig["nn_threshold"])
 			nn.setBlobPath(blob_path)
 			nn.setNumInferenceThreads(2)
 			# Linking
@@ -319,6 +320,8 @@ class DeviceManager():
 		det_normal = []
 		for detection in detections:
 			label = detection.label
+			if self.names is not None:
+				label = self.names[int(label)]
 			score = detection.confidence
 			xmin,ymin,xmax,ymax = detection.xmin,detection.ymin,detection.xmax,detection.ymax
 			xmin,xmax = int(xmin*self.size[0]),int(xmax*self.size[0])
@@ -472,6 +475,9 @@ class DeviceManager():
 		control.setManualExposure(exposure,iso)
 		self.q_monoscontrol.send(control)
 
+	def set_labels_names(self,names:list = None):
+		if names is not None:
+			self.names = names
 
 	def get_intrinsic(self):
 		self.intrinsic_info = {}
