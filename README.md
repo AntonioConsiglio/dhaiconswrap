@@ -1,6 +1,6 @@
 # dhaiconswrap
 
-Depthai Wrapper with amazing operational feature!
+Depthai wrapper with amazing operational feature!
 
 ## How to Install?
 
