@@ -7,7 +7,7 @@
 prova.py
 /pippo
 /.vscode
-/dhaiconswrap.egg-info
+*.egg-info
 /build
 /dist
 setup.py
