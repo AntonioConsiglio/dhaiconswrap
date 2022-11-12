@@ -21,14 +21,6 @@ from .camera_funcion_utils import BlobException, \
 								  visualise_Axes, \
 								  DEPTH_RESOLUTIONS,MEDIAN_KERNEL,COLOR_RESOLUTIONS
 
-if not "camera_configuration.json" in os.listdir(os.getcwd()):
-	create_depthconf_json(os.path.join(os.getcwd(),"18443010D1456C1200_camera_configuration.json"))
-	create_depthconf_json(os.path.join(os.getcwd(),"camera_configuration.json"))
-	print("""##################################################################################### \n
-[WARNING MESSAGE] : A camera configuration file was created with default setting because
-			this file is used to configure the stereo camera! \n
-#####################################################################################""")
-
 class DeviceManager():
 	'''
 	INPUT:\n
@@ -71,10 +63,19 @@ class DeviceManager():
 		configfile = None
 		if self.deviceId is None:
 			jpath = os.path.join(jpath,"camera_configuration.json")
+			if not os.path.isfile(jpath):
+				create_depthconf_json(jpath)
+				print("#"*70,"\n","[WARNING MESSAGE] : A camera configuration file was created with default setting because",
+						"this file is used to configure the stereo camera!\n","#"*70)
 			with open(jpath) as jsonfile:
 				configfile = json.load(jsonfile)
 			return configfile
 		jpath = os.path.join(jpath,f"{self.deviceId}_camera_configuration.json")
+		if not os.path.isfile(jpath):
+			if not "camera_configuration.json" in os.listdir(os.getcwd()):
+				create_depthconf_json(jpath)
+				print("#"*70,"\n","[WARNING MESSAGE] : A camera configuration file was created with default setting because",
+						"this file is used to configure the stereo camera!\n","#"*70)
 		with open(jpath) as jsonfile:
 				configfile = json.load(jsonfile)
 		return configfile

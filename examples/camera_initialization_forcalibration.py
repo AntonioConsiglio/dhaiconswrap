@@ -4,11 +4,12 @@
 ##                                      ##
 ##########################################
 from dhaiconswrap import DeviceManager,docalibration,get_available_devices,domulticalibration
+import os
 
 CHESSBOARD_PARAMETERS = [16,9,15] #List of ColumnsCorners, RowCorners, SquareWidth of chessboard
 CALIBRATION_ROI =  [0,0,1080,1920] #The RGB image for calibration is 1920x1080. 
 SHIFT_CALIBRATION = [0,0,0] # Trasport vector, if is needed to set the axes center in another position instead of the chessboard corner
-CALIBRATION_PATH = "./" # Where the calibration .json file are stored after the calibration procces. This path is used also for load it.
+CALIBRATION_PATH = os.path.join(os.getcwd(),"examples","settings_files") # Where the calibration .json file are stored after the calibration procces. This path is used also for load it.
                         #Is adviced to leave the default folder or you need to override the class methods used to call these files.
 
 ## SINGLE CAM CALIBRATION
@@ -16,7 +17,8 @@ def main_calibration():
     device = DeviceManager(size = (1920,1080),
                            fps= 30,
                            calibration_mode=True,
-                           verbose=True)
+                           verbose=True,
+                           config_path=os.path.join(os.getcwd(),"examples","settings_files"))
     device.enable_device()
 
     _ = docalibration(device_manager=device,
@@ -38,7 +40,8 @@ def multi_cam_calibration():
                             fps= 30,
                             deviceid=dev_name,
                             calibration_mode=True,
-                            verbose=True)
+                            verbose=True,
+                            config_path=os.path.join(os.getcwd(),"examples","settings_files"))
         device.enable_device()
         devices[dev_name] = device
     

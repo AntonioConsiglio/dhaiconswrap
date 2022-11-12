@@ -1,0 +1,23 @@
+{
+ "ColorSensorResolution": "1080",
+ "StereoSensorResolution": "480",
+ "StereoSensorResolution_calibration": "480",
+ "MedianFilterKernel": 5,
+ "LeftRightCheck": true,
+ "ExtendedDisparity": false,
+ "Subpixel": false,
+ "speckleFilter": false,
+ "speckleRange": 50,
+ "temporalFilter": true,
+ "spatialFilter": true,
+ "holeFillingRadius": 2,
+ "numIterations": 1,
+ "thresholdFilter_minRange": 300,
+ "thresholdFilter_maxRange": 1500,
+ "decimationFactor": 1,
+ "nn_threshold": 0.5,
+ "nn_size": [
+  300,
+  300
+ ]
+}

@@ -57,12 +57,13 @@ def get_available_devices():
 	return cameras_id
 
 def create_depthconf_json(path):
+
 	configuration = {"ColorSensorResolution":"1080",
 					"StereoSensorResolution":"480",    
 					"StereoSensorResolution_calibration":"480",
 					"MedianFilterKernel":5,
 					"LeftRightCheck":True,
-					"ExtendedDisparity": True,
+					"ExtendedDisparity": False,
 					"Subpixel":False,
 					"speckleFilter": False,
 					"speckleRange":50,

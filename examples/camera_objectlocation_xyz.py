@@ -6,11 +6,12 @@
 from dhaiconswrap import DeviceManager,get_available_devices,domulticalibration
 from dhaiconswrap.camera_funcion_utils import visualise_Axes
 import cv2
+import os
 
 CHESSBOARD_PARAMETERS = [16,9,15] #List of ColumnsCorners, RowCorners, SquareWidth of chessboard
 CALIBRATION_ROI =  [0,0,1080,1920] #The RGB image for calibration is 1920x1080. 
 SHIFT_CALIBRATION = [0,0,0] # Trasport vector, if is needed to set the axes center in another position instead of the chessboard corner
-CALIBRATION_PATH = "./settings_files" # Where the calibration .json file are stored after the calibration procces. This path is used also for load it.
+CALIBRATION_PATH = os.path.join(os.getcwd(),"examples","settings_files")# Where the calibration .json file are stored after the calibration procces. This path is used also for load it.
                         #Is adviced to leave the default folder or you need to override the class methods used to call these files.
 
 
@@ -25,7 +26,7 @@ def multi_cam_calibration():
                             deviceid=dev_name,
                             calibration_mode=True,
                             verbose=True,
-                            config_path="./settings_files")
+                            config_path=os.path.join(os.getcwd(),"examples","settings_files"))
         device.enable_device()
         devices[dev_name] = device
     
@@ -51,14 +52,14 @@ def multi_easy():
                             deviceid=devID,
                             calibration_mode=False,
                             verbose=True,
-                            config_path="./settings_files")
+                            config_path=os.path.join(os.getcwd(),"examples","settings_files"))
         device.enable_device(usb2Mode=False)
         devices[devID] = device
     # SET DEPTH VALID AND Z THRESHOLD
     device.pointcloud_manager.set_options(5,-1.0)
 
     #RUNTIME
-    while True:
+    for _ in range(150):
         for devId,device in devices.items():
             res,frames,results = device.pull_for_frames()
             if res:

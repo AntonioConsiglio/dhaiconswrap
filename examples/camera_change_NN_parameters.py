@@ -20,25 +20,27 @@ class PersonalDeviceManager(DeviceManager):
 		super(PersonalDeviceManager,self).__init__(**kargs)
 	
 	## THIS FUNCTION FOR CONFIGURE THE INPUT IMAGE SIZE AND CHANNELS
-	def _configure_image_manipulator(self,pipeline,verbose):
 
+	def _configure_image_manipulator(self,pipeline,verbose):
+		size = self.depthconfig["nn_size"]
 		manip = pipeline.create(dhai.node.ImageManip)
 		manipOut = pipeline.create(dhai.node.XLinkOut)
 		manipOut.setStreamName('neural_input')
-		manip.initialConfig.setResize(300,300)
+		manip.initialConfig.setResize(*size)
 		manip.initialConfig.setFrameType(dhai.ImgFrame.Type.BGR888p)
 		manip.out.link(manipOut.input)
 		
 		return manip,manipOut
 
 	## THIS FUNCTION FOR CONFIGURE THE NEURAL NETWORK NODE
+
 	def _configure_nn_node(self,manip,pipeline,blob_path,verbose):
 			
 			nn = pipeline.create(dhai.node.MobileNetDetectionNetwork)
 			nnOut = pipeline.create(dhai.node.XLinkOut)
 			nnOut.setStreamName("neural")
 			# define nn features
-			nn.setConfidenceThreshold(0.5)
+			nn.setConfidenceThreshold(self.depthconfig["nn_threshold"])
 			nn.setBlobPath(blob_path)
 			nn.setNumInferenceThreads(2)
 			# Linking
@@ -49,7 +51,8 @@ def main_easy():
 	device = PersonalDeviceManager(size = (640,480),
 									fps= 30,
 									nn_mode = True,
-									blob_path = BLOB_PATH)
+									blob_path = BLOB_PATH,
+									)
 	device.enable_device()
 	for _ in range(50):
 		res,frames,results = device.pull_for_frames()
