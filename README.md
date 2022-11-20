@@ -11,6 +11,6 @@ pip install dhaiconswrap
 With some lines of code you will able to:
 
 - Run the device with custom setting using a .json configuration file
-- Perform inference using the SSD object detection model and have the detections already drawn as output
+- Perform inference using the SSD or YOLO object detection model and have the detections already drawn as output
 - Run Spatial object localization with custom coordinates system or camera system, also using only a fixed frame without detections.
 - Calibrate single or multiple camera using a chessboard
