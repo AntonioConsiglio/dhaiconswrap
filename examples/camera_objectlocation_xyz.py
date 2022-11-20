@@ -77,5 +77,5 @@ def multi_easy():
 
 if __name__ == '__main__':
 
-    _ = multi_cam_calibration()
+    #_ = multi_cam_calibration()
     multi_easy()

@@ -35,13 +35,15 @@ class DeviceManager():
 	'''
 
 	def __init__(self,size:tuple[int,int]=(640,480),fps:int =30,deviceid: str = None,
-				nn_mode:bool=False,calibration_mode:bool= False,
+				nn_mode:bool=False,nn_model:str = "SSD",calibration_mode:bool= False,
 				blob_path:str=None,verbose:bool = False,config_path:str = './'):
 		self.pipeline = dhai.Pipeline()
 		self.size = size
 		self.fps = fps
 		self.deviceId = deviceid
 		self.nn_active = nn_mode
+		assert nn_model in ["SSD","YOLO"], "SELECT THE ONE OF THE TWO AVAILABLE ARCHITECTURE ['SSD' or 'YOLO']"
+		self.nn_model = nn_model
 		self.calibration = calibration_mode
 		self.verbose = verbose
 		self.depth_error = False
@@ -52,6 +54,7 @@ class DeviceManager():
 		self.depthconfig = self._load_configuration(config_path)
 		self._configure_device()
 		self.node_list = self.pipeline.getNodeMap()
+		print(self.node_list)
 
 	def _configure_device(self):
 
@@ -125,8 +128,8 @@ class DeviceManager():
 		self.q_rgbcontrol = self.device_.getInputQueue("rgb_control")
 		self.q_monoscontrol = self.device_.getInputQueue("monos_control")
 		if self.nn_active:
-			self.q_nn = self.device_.getOutputQueue('neural',maxSize=4,blocking=False)
-			self.q_nn_input = self.device_.getOutputQueue('neural_input',maxSize=4,blocking=False)
+			self.q_nn = self.device_.getOutputQueue('neural',maxSize=4,blocking=True)
+			self.q_nn_input = self.device_.getOutputQueue('neural_input',maxSize=4,blocking=True)
 	
 	def pull_for_frames(self,get_pointscloud=True,write_detections=True):
 		'''
@@ -235,13 +238,31 @@ class DeviceManager():
 	@infoprint
 	def _configure_nn_node(self,manip,pipeline,blob_path,verbose):
 			
-			nn = pipeline.create(dhai.node.MobileNetDetectionNetwork)
-			nnOut = pipeline.create(dhai.node.XLinkOut)
-			nnOut.setStreamName("neural")
-			# define nn features
-			nn.setConfidenceThreshold(self.depthconfig["nn_threshold"])
-			nn.setBlobPath(blob_path)
-			nn.setNumInferenceThreads(2)
+			if self.nn_model == "SSD":
+				nn = pipeline.create(dhai.node.MobileNetDetectionNetwork)
+				nnOut = pipeline.create(dhai.node.XLinkOut)
+				nnOut.setStreamName("neural")
+				# define nn features
+				nn.setConfidenceThreshold(self.depthconfig["nn_threshold"])
+				nn.setBlobPath(blob_path)
+				nn.setNumInferenceThreads(2)
+			elif self.nn_model == "YOLO":
+				nn = pipeline.create(dhai.node.YoloDetectionNetwork)
+				nnOut = pipeline.create(dhai.node.XLinkOut)
+				nnOut.setStreamName("neural")
+				with open(os.path.join(os.path.dirname(blob_path),"best.json")) as file:
+					info = json.load(file)
+					config = info["nn_config"]
+					metadata = config["NN_specific_metadata"]
+					
+					# define nn features
+					nn.setConfidenceThreshold(metadata["confidence_threshold"])
+					nn.setNumClasses(metadata['classes'])
+					nn.setAnchors(metadata['anchors'])
+					nn.setAncohorMasks(metadata['anchor_masks'])
+					nn.setBlobPath(blob_path)
+					nn.setIouThreashold(metadata["iou_threshold"])
+					nn.setNumInferenceThreads(2)
 			# Linking
 			manip.out.link(nn.input)
 			nn.out.link(nnOut.input)

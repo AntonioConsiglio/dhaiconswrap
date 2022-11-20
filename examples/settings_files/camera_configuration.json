@@ -17,7 +17,7 @@
  "decimationFactor": 1,
  "nn_threshold": 0.5,
  "nn_size": [
-  300,
-  300
+  448,
+  448
  ]
 }
