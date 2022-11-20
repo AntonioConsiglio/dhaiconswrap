@@ -54,7 +54,6 @@ class DeviceManager():
 		self.depthconfig = self._load_configuration(config_path)
 		self._configure_device()
 		self.node_list = self.pipeline.getNodeMap()
-		print(self.node_list)
 
 	def _configure_device(self):
 
@@ -151,7 +150,7 @@ class DeviceManager():
 			nn_foto = None
 			if self.nn_active:
 				nn_foto = self.q_nn_input.tryGet()
-				nn_detection = self.q_nn.tryGet()
+				nn_detection = self.q_nn.get()
 				if nn_detection is not None:
 					detections = nn_detection.detections
 				else:
@@ -250,7 +249,11 @@ class DeviceManager():
 				nn = pipeline.create(dhai.node.YoloDetectionNetwork)
 				nnOut = pipeline.create(dhai.node.XLinkOut)
 				nnOut.setStreamName("neural")
-				with open(os.path.join(os.path.dirname(blob_path),"best.json")) as file:
+				try:
+					jsonfile = [j for j in os.listdir(os.path.dirname(blob_path)) if j.rsplit(".")[1] == "json"][0]
+				except Exception as e:
+					print(e)
+				with open(os.path.join(os.path.dirname(blob_path),jsonfile)) as file:
 					info = json.load(file)
 					config = info["nn_config"]
 					metadata = config["NN_specific_metadata"]
@@ -259,9 +262,9 @@ class DeviceManager():
 					nn.setConfidenceThreshold(metadata["confidence_threshold"])
 					nn.setNumClasses(metadata['classes'])
 					nn.setAnchors(metadata['anchors'])
-					nn.setAncohorMasks(metadata['anchor_masks'])
+					nn.setAnchorMasks(metadata['anchor_masks'])
 					nn.setBlobPath(blob_path)
-					nn.setIouThreashold(metadata["iou_threshold"])
+					nn.setIouThreshold(metadata["iou_threshold"])
 					nn.setNumInferenceThreads(2)
 			# Linking
 			manip.out.link(nn.input)

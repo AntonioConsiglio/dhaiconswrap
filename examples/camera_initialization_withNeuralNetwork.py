@@ -1,6 +1,6 @@
 ##########################################
 ##                                      ##
-##    VERSION => dhaiconswrap-0.2.5     ##
+##    VERSION => dhaiconswrap-0.2.7     ##
 ##                                      ##
 ##########################################
 
@@ -9,10 +9,10 @@ import cv2
 import os
 import numpy as np
 
-## USED ONLY SSD MODELS - FOR YOLO MODEL LOOK THE OTHER EXAMPLE
+## USED SSD MODELS or YOLO MODELS
 
 BLOB_PATH = os.path.join("examples","blob_path","mobilenet-ssd_openvino_2021.2_6shave.blob")
-BLOB_PATH = os.path.join("examples","blob_path","yolo72","best24_openvino_2021.4_6shave.blob")
+BLOB_PATH = os.path.join("examples","blob_path","yolov7","best24_openvino_2021.4_6shave.blob")
 
 def main_neural_network():
     device = DeviceManager(size = (640,480),
@@ -23,7 +23,7 @@ def main_neural_network():
     device.enable_device()
     # set the names of your class labeled
     #device.set_labels_names([i*"person" for i in np.ones(20,dtype=int)])
-    device.set_labels_names(['none','cork'])
+    device.set_labels_names(['cork'])
     # SET DEPTH VALID AND Z THRESHOLD
     device.pointcloud_manager.set_options(3,0.5)
 
